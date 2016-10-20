@@ -32,7 +32,6 @@ struct VSInput
 {
     float4 position : POSITION;
     float3 normal : NORMAL;
-    float2 tex : TEXCOORD0;
 	int index1 : INDEX0;
 	int index2 : INDEX1;
 	int index3 : INDEX2;
@@ -41,12 +40,14 @@ struct VSInput
 	float weight2 : WEIGHT1;
 	float weight3 : WEIGHT2;
 	float weight4 : WEIGHT3;
+    float2 tex : TEXCOORD0;
 };
 struct PSInput
 {
     float4 position : SV_POSITION;
     float3 worldPos : POSITION;
     float2 tex : TEXCOORD0;
+	float4 color: COLOR;
 	//float3 normal : NORMAL;
 
     //float3 ViewDirection :   TEXCOORD1;
@@ -84,7 +85,9 @@ PSInput VS(VSInput input)
     p2=mul(input.position,i2);
     p3=mul(input.position,i3);
     p4 = mul(input.position,i4);
+	//output.position = Pos;
 	//output.position = p1;
+	//output.position = w1 * p1 + (1 - w1) * p2;
     output.position= (w1*p1+w2*p2+w3*p3+w4*p4);
     output.position = mul(output.position, WorldViewProjection);
     //output.position = mul(output.position, matView);
@@ -92,7 +95,10 @@ PSInput VS(VSInput input)
 
     // Store the texture coordinates for the pixel shader.
     output.tex = input.tex;
-    
+	output.color.x = w1;
+	output.color.y = w2;
+	output.color.z = w3;
+	output.color.w = w4;
     // Calculate the normal vector against the world matrix only.
     //output.normal = mul(input.normal, (float3x3)World);
 
@@ -118,6 +124,7 @@ float4 PS(PSInput input) : SV_Target
     // float3 toEyeW = normalize(gEyeW - input.worldPos);
 
     // return ComputeDirectionalLight(gMaterial, gDirLight, input.normal, toEyeW);
+	//return input.color;
 	return saturate(
         shaderTextures[0].Sample(SampleType, input.tex)
         );

@@ -34,9 +34,10 @@ namespace MyMeshData
 
 		XMFLOAT3 Position;
 		XMFLOAT3 Normal;
-		XMFLOAT2 TexCoord;
+		//UINT32 p1;
 		XMINT4 indeces;
 		XMFLOAT4 weights;
+		XMFLOAT2 TexCoord;
 		//XMFLOAT3 Binormal;
 		//XMFLOAT3 Tangent;
 	};
