@@ -41,7 +41,9 @@ void XTest::OnInit()
 			{"WEIGHT", 1, DXGI_FORMAT_R32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
 			{"WEIGHT", 2, DXGI_FORMAT_R32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
 			{"WEIGHT", 3, DXGI_FORMAT_R32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
-			{"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
+			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+			{"TYPE", 0, DXGI_FORMAT_R8_UINT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
+
 		};
 	UINT numElements = ARRAYSIZE(layout);
 
@@ -61,7 +63,7 @@ void XTest::OnInit()
 	motion_controller_.LoadModel(L"..\\data\\fg\\", L"fg.pmx", L"tda2.vmd");
 
 
-	std::vector<MyMeshData::Vertex> vertices;
+	//std::vector<MyMeshData::Vertex> model_vertices_;
 	auto &model = motion_controller_.getModel();
 	auto vs = model.vertices.get();
 	for (int i = 0; i < model.vertex_count; ++i)
@@ -75,17 +77,16 @@ void XTest::OnInit()
 		switch (it->skinning_type)
 		{
 		case pmx::PmxVertexSkinningType::BDEF1:
-			vertices.push_back(MyMeshData::Vertex(it->positon, it->normal, it->uv, sk->bone_index, 0, 0, 0, 1, 0, 0, 0));
+			model_vertices_.push_back(MyMeshData::Vertex(it->positon, it->normal, it->uv, sk->bone_index, 0, 0, 0, 1, 0, 0, 0));
 			break;
 		case pmx::PmxVertexSkinningType::BDEF2:
-			vertices.push_back(MyMeshData::Vertex(it->positon, it->normal, it->uv, sk2->bone_index1, sk2->bone_index2, 0, 0, sk2->bone_weight, 1 - sk2->bone_weight, 0, 0));
+			model_vertices_.push_back(MyMeshData::Vertex(it->positon, it->normal, it->uv, sk2->bone_index1, sk2->bone_index2, 0, 0, sk2->bone_weight, 1 - sk2->bone_weight, 0, 0));
 			break;
 		case pmx::PmxVertexSkinningType::BDEF4:
-			vertices.push_back(MyMeshData::Vertex(it->positon, it->normal, it->uv, sk4->bone_index1, sk4->bone_index2, sk4->bone_index3, sk4->bone_index4, sk4->bone_weight1, sk4->bone_weight2, sk4->bone_weight3, sk4->bone_weight3));
-			//assert(sk4->bone_weight1 + sk4->bone_weight2 + sk4->bone_weight3 + sk4->bone_weight4 == 1.0f);
+			model_vertices_.push_back(MyMeshData::Vertex(it->positon, it->normal, it->uv, sk4->bone_index1, sk4->bone_index2, sk4->bone_index3, sk4->bone_index4, sk4->bone_weight1, sk4->bone_weight2, sk4->bone_weight3, sk4->bone_weight3));
 			break;
 		case pmx::PmxVertexSkinningType::SDEF:
-			vertices.push_back(MyMeshData::Vertex(it->positon, it->normal, it->uv, sks->bone_index1, sks->bone_index2, 0, 0, sks->bone_weight, 1 - sks->bone_weight, 0, 0));
+			model_vertices_.push_back(MyMeshData::Vertex(it->positon, it->normal, it->uv, sks->bone_index1, sks->bone_index2, 0, 0, sks->bone_weight, 1 - sks->bone_weight, 0, 0));
 			break;
 		default:
 			//vertices.push_back(MyMeshData::Vertex(it->positon, it->normal, it->uv, 0, 0, 0, 0, 1, 0, 0,0));
@@ -104,21 +105,22 @@ void XTest::OnInit()
 		//if (sk->bone_index4 >= motion_controller_.bone_count_)
 		//	sk->bone_index4 -= motion_controller_.bone_count_;
 	}
+	//model.vertices._Delete();
+	morph_vertices_ = model_vertices_;
 
-
-	UINT totalVertexCount = vertices.size();
+	UINT totalVertexCount = model_vertices_.size();
 
 	D3D11_BUFFER_DESC vbd;
 	ZeroMemory(&vbd, sizeof(vbd));
-	vbd.Usage = D3D11_USAGE_DEFAULT;
+	vbd.Usage = D3D11_USAGE_DYNAMIC;
 	vbd.ByteWidth = sizeof(MyMeshData::Vertex) * totalVertexCount;
 	vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-	vbd.CPUAccessFlags = 0;
+	vbd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
 
 	D3D11_SUBRESOURCE_DATA InitData;
 	ZeroMemory(&InitData, sizeof(InitData));
-	InitData.pSysMem = &vertices[0];
+	InitData.pSysMem = &model_vertices_[0];
 	hr = _pd3dDevice->CreateBuffer(&vbd, &InitData, &vertex_buffer_d3dptr_);
 	if (FAILED(hr))
 		return;
@@ -256,8 +258,6 @@ void XTest::OnUpdate()
 			dwTimeStart = dwTimeCur;
 		}
 	}
-	motion_controller_.updateBoneAnimation();
-	motion_controller_.updateMatrix();
 	constant_buffer_.mDirLight = dir_light_;
 	constant_buffer_.mMaterial = material_;
 	constant_buffer_.mEyeW = XMFLOAT3(20.0f, 20.0f, 20.0f);
@@ -273,6 +273,15 @@ void XTest::OnUpdate()
 //--------------------------------------------------------------------
 void XTest::OnRender()
 {
+	D3D11_MAPPED_SUBRESOURCE mappedResource;
+
+	//motion_controller_.updateMorphAnimation(model_vertices_, morph_vertices_);
+	motion_controller_.updateBoneAnimation();
+	motion_controller_.updateMatrix();
+	_pImmediateContext->Map(vertex_buffer_d3dptr_, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+	memcpy(mappedResource.pData, morph_vertices_.data(), sizeof(MyMeshData::Vertex) * morph_vertices_.size());
+	_pImmediateContext->Unmap(vertex_buffer_d3dptr_, 0);
+
 	// Just clear the backbuffer
 	float ClearColor[4] = {0.5f, 0.5f, 0.5f, 1.0f}; //red,green,blue,alpha
 	_pImmediateContext->ClearRenderTargetView(_pRenderTargetView, ClearColor);

@@ -3,6 +3,7 @@
 #include "../MMDFormats/MikuMikuFormats/Pmx.h"
 #include <list>
 #include "mathUtil.h"
+#include "GeometryData.h"
 
 class MotionController
 {
@@ -31,6 +32,7 @@ public:
 		return model_base_;
 	}
 
+	void updateMorphAnimation(const std::vector<MyMeshData::Vertex>&, std::vector<MyMeshData::Vertex>&);
 	void updateBoneAnimation();
 	std::vector<DirectX::XMMATRIX> skeleton_matrix;
 
@@ -44,6 +46,7 @@ public:
 		ctime++;
 	}
 	int bone_count_;
+	int morph_count_;
 private:
 	std::wstring model_base_;
 
@@ -58,9 +61,13 @@ private:
 	std::vector<DirectX::XMMATRIX> skeleton_locals;
 	std::vector<TreeNode> skeleton_tree_;
 
+	std::vector<std::list<vmd::VmdFaceFrame>> morph_key_frames_;
+	std::vector<std::list<vmd::VmdFaceFrame>::iterator> morph_key_frames_itr_;
+	std::vector<float> morph_weights_;
+
 	int ctime;
 	int root_index_;
-	void allocVectors(int bone_size);
+	void allocVectors();
 	void buildSkeletonTree();
 	void calcMatrix(int i);
 };

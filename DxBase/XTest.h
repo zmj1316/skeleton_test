@@ -8,6 +8,7 @@
 #include "../MMDFormats/MikuMikuFormats/Pmx.h"
 #include "../MMDFormats/MikuMikuFormats/Vmd.h"
 #include "MotionController.h"
+#include "GeometryData.h"
 
 using namespace DirectX;
 
@@ -104,6 +105,8 @@ private:
 	int mesh_index_count_;
 
 	MotionController motion_controller_;
+	std::vector<MyMeshData::Vertex> model_vertices_;
+	std::vector<MyMeshData::Vertex> morph_vertices_;
 	////physx world
 	//PhysXWorld              g_myPxWorld;
 };
