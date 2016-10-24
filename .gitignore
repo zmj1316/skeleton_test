@@ -206,3 +206,5 @@ FakesAssemblies/
 
 data/
 *.db
+*.opendb
+*.7z

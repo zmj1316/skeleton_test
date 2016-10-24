@@ -58,7 +58,7 @@ namespace MathUtil
 			xz - wy, yz + wx, 1 - (xx + yy), 0,
 			0,0,0, 1);
 
-		return DirectX::XMMatrixTranspose(XMLoadFloat4x4(&mw));
+		return /*DirectX::XMMatrixTranspose*/(XMLoadFloat4x4(&mw));
 	}
 	inline DirectX::XMMATRIX compose(vec3 position)
 	{

@@ -137,8 +137,8 @@ void Camera::update(float dt)
 		dir += L * gDInput->mouseDZ()/2;
 	}
 	mEyes = mEyes + dir * mSpeed * dt;
-	if(gDInput->mouseDZ()==0)
-	 mLookat = mLookat + dir*mSpeed*dt;
+	//if(gDInput->mouseDZ()==0)
+	// mLookat = mLookat + dir*mSpeed*dt;
 
 	//change orientation when push the right button of mouse
 	float pitch = 0.0f;

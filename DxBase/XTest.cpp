@@ -60,7 +60,7 @@ void XTest::OnInit()
 
 	// Load Model
 
-	motion_controller_.LoadModel(L"..\\data\\fg\\", L"fg.pmx", L"tda2.vmd");
+	motion_controller_.LoadModel(L"..\\data\\tda2\\", L"tda.pmx", L"tda2.vmd");
 
 
 	//std::vector<MyMeshData::Vertex> model_vertices_;
@@ -86,7 +86,8 @@ void XTest::OnInit()
 			model_vertices_.push_back(MyMeshData::Vertex(it->positon, it->normal, it->uv, sk4->bone_index1, sk4->bone_index2, sk4->bone_index3, sk4->bone_index4, sk4->bone_weight1, sk4->bone_weight2, sk4->bone_weight3, sk4->bone_weight3));
 			break;
 		case pmx::PmxVertexSkinningType::SDEF:
-			model_vertices_.push_back(MyMeshData::Vertex(it->positon, it->normal, it->uv, sks->bone_index1, sks->bone_index2, 0, 0, sks->bone_weight, 1 - sks->bone_weight, 0, 0));
+			model_vertices_.push_back(MyMeshData::Vertex(it->positon, it->normal, it->uv, sks->bone_index1, sks->bone_index2, -1, 0, sks->bone_weight, sks->sdef_c[0], sks->sdef_c[1], sks->sdef_c[2]));
+			//model_vertices_.push_back(MyMeshData::Vertex(it->positon, it->normal, it->uv, sks->bone_index1, sks->bone_index2, 0, 0, sks->bone_weight, 1 - sks->bone_weight, 0, 0));
 			break;
 		default:
 			//vertices.push_back(MyMeshData::Vertex(it->positon, it->normal, it->uv, 0, 0, 0, 0, 1, 0, 0,0));
@@ -275,7 +276,7 @@ void XTest::OnRender()
 {
 	D3D11_MAPPED_SUBRESOURCE mappedResource;
 
-	//motion_controller_.updateMorphAnimation(model_vertices_, morph_vertices_);
+	motion_controller_.updateMorphAnimation(model_vertices_, morph_vertices_);
 	motion_controller_.updateBoneAnimation();
 	motion_controller_.updateMatrix();
 	_pImmediateContext->Map(vertex_buffer_d3dptr_, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);

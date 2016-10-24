@@ -43,7 +43,7 @@ namespace MathUtil
 				break;
 			}
 
-			if ((lowXCalc * divideXCalc)<0)
+			if ((lowXCalc * divideXCalc)<=0)
 			{
 				//cout<<"signs different"<<endl;
 				highTGuess = dividingT;

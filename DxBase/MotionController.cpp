@@ -165,22 +165,27 @@ void MotionController::updateBoneAnimation()
 				auto *param = bone_key_frames_itr_[i]->interpolation;
 
 				s = MathUtil::bezier(T, param[0], param[4], param[8], param[12]);
+				//s = 1 - s;
 				skeleton_position[i].x = position0.x + (position1.x - position0.x)*s;
 				s = MathUtil::bezier(T, param[1], param[5], param[9], param[13]);
+				//s = 1 - s;
 				skeleton_position[i].y = position0.y + (position1.y - position0.y)*s;
 				s = MathUtil::bezier(T, param[2], param[6], param[10], param[14]);
+				//s = 1 - s;
 				skeleton_position[i].z = position0.z + (position1.z - position0.z)*s;
+				//skeleton_position[i] = position0 + (position1 - position0)*T;
 
 				s = MathUtil::bezier(T, param[3], param[7], param[11], param[15]);
-				skeleton_position[i] = position0 + (position1 - position0)*T;
-				skeleton_rotation[i] = MathUtil::Slerp(rotation0, rotation1,T);
+				//s = 1 - s;
+				skeleton_rotation[i] = MathUtil::Slerp(rotation0, rotation1,s);
+				//skeleton_rotation[i] = rotation0;
 				if (ctime != t1) --bone_key_frames_itr_[i];
 			}
 			if (bone.parent_index >= 0)
 			{
 				skeleton_position[i] += bone.position - model_.bones[bone.parent_index].position;
 			}
-			skeleton_locals[i] = MathUtil::compose(skeleton_rotation[i])*MathUtil::compose(skeleton_position[i]);
+			skeleton_locals[i] = MathUtil::compose(skeleton_position[i])*MathUtil::compose(skeleton_rotation[i]);
 		}
 	}
 }

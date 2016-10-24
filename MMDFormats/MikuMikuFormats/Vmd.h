@@ -32,7 +32,7 @@ namespace vmd
 			name = oguna::EncodingConverter::sjis2utf16(buffer);
 			stream->read((char*) &frame, sizeof(int));
 			stream->read((char*) &position, sizeof(vec3));
-			position.z = -position.z;
+			//position.z = -position.z;
 			stream->read((char*) &orientation, sizeof(vec4));
 			stream->read((char*) interpolation, sizeof(char) * 4 * 4 * 4);
 		}

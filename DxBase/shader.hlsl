@@ -78,17 +78,44 @@ PSInput VS(VSInput input)
     i3 = skeleton[input.index3];
     i4 = skeleton[input.index4];
     w1=input.weight1;
+    p1=mul(input.position,i1);
     w2=input.weight2;
+	if (input.index3 < 0) {
+		w2 = 1 - input.weight1;
+		p2 = mul(input.position, i2);
+		float4 rc;
+		rc.x = input.weight2;
+		rc.y = input.weight3;
+		rc.z = input.weight4;
+		rc.w = 1.0f;
+		rc = mul(rc, i1);
+		rc.xyz /= rc.w;
+		//float3 position = w1*(p1)+w2*(p2);
+		//rc += (position * r,0);
+		float4 position = w1*(p1) + w2*(p2);
+		position.xyz /= position.w;
+		p1.xyz /= p1.w;
+		float3 d1 = p1.xyz - rc.xyz;
+		float r1 = dot(d1, d1);
+		float3 d2 = position.xyz - rc.xyz;
+		float r2 = dot(d2, d2);
+		output.position = position;
+		//if (r2 < r1) {
+		//	output.position.xyz = rc.xyz + d2*sqrt(r1 / r2);
+		//}
+	}
+	else {
+
+    p2=mul(input.position,i2);
     w3 = input.weight3;
     w4= input.weight4;
-    p1=mul(input.position,i1);
-    p2=mul(input.position,i2);
     p3=mul(input.position,i3);
     p4 = mul(input.position,i4);
 	//output.position = Pos;
 	//output.position = p1;
 	//output.position = w1 * p1 + (1 - w1) * p2;
     output.position= (w1*p1+w2*p2+w3*p3+w4*p4);
+	}
     output.position = mul(output.position, WorldViewProjection);
     //output.position = mul(output.position, matView);
     //output.position = mul(output.position, WorldViewProjection);
