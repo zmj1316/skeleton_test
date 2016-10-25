@@ -48,8 +48,6 @@ bool MotionController::LoadModel(std::wstring model_base, std::wstring pmx_name,
 	}
 
 
-
-
 	for (auto i = 0; i < model_.bone_count; ++i)
 	{
 		bone_key_frames_[i].sort([](vmd::VmdBoneFrame x, vmd::VmdBoneFrame y)
@@ -88,11 +86,10 @@ bool MotionController::LoadModel(std::wstring model_base, std::wstring pmx_name,
 	for (auto i = 0; i < model_.morph_count; ++i)
 	{
 		morph_key_frames_[i].sort([](vmd::VmdFaceFrame x, vmd::VmdFaceFrame y)
-		{
-			return x.frame < y.frame;
-		});
+			{
+				return x.frame < y.frame;
+			});
 		morph_key_frames_itr_[i] = morph_key_frames_[i].begin();
-
 	}
 	return true;
 }
@@ -100,34 +97,34 @@ bool MotionController::LoadModel(std::wstring model_base, std::wstring pmx_name,
 
 void MotionController::updateMatrix()
 {
-	calcMatrix(root_index_);
+	updateChildSkeletonMatrix(root_index_);
 	for (int i = 0; i < bone_count_; ++i)
 	{
-		skeleton_matrix[i] = skeleton_matrix[i] * inv_position[i];
+		skeleton_matrix[i] = inv_position[i] * skeleton_matrix[i];
 	}
 }
 
-void MotionController::updateMorphAnimation(const std::vector<MyMeshData::Vertex>& origin_vertices, std::vector<MyMeshData::Vertex>& morph_vertics)
+void MotionController::updateMorphAnimation(const std::vector<MyMeshData::Vertex> &origin_vertices, std::vector<MyMeshData::Vertex> &morph_vertics)
 {
 	morph_vertics = origin_vertices;
 	for (auto i = 0; i < morph_count_; ++i)
 	{
 		auto &morph = model_.morphs.get()[i];
 		if (morph.morph_type == pmx::MorphType::Bone)
-			std::cout<<"stop here";
+			std::cout << "stop here";
 		if (morph.morph_type != pmx::MorphType::Vertex)
 			continue;
-		if(morph_key_frames_itr_[i] != morph_key_frames_[i].end())
+		if (morph_key_frames_itr_[i] != morph_key_frames_[i].end())
 		{
 			long t0 = morph_key_frames_itr_[i]->frame;
 			float val0 = morph_key_frames_itr_[i]->weight;
-			if(++morph_key_frames_itr_[i] != morph_key_frames_[i].end())
+			if (++morph_key_frames_itr_[i] != morph_key_frames_[i].end())
 			{
 				long t1 = morph_key_frames_itr_[i]->frame;
 				float val1 = morph_key_frames_itr_[i]->weight;
-				float s = (float)(ctime - t0) / (float)(t1 - t0);	//Linear Interpolation
+				float s = (float)(ctime - t0) / (float)(t1 - t0); //Linear Interpolation
 
-				morph_weights_[i] = val0 + (val1 - val0)*s;
+				morph_weights_[i] = val0 + (val1 - val0) * s;
 
 				if (ctime != t1) --morph_key_frames_itr_[i];
 			}
@@ -135,7 +132,7 @@ void MotionController::updateMorphAnimation(const std::vector<MyMeshData::Vertex
 
 		for (auto j = 0; j < morph.offset_count; ++j)
 		{
-			auto& vertex_morph = morph.vertex_offsets.get()[j];
+			auto &vertex_morph = morph.vertex_offsets.get()[j];
 			morph_vertics[vertex_morph.vertex_index].Position.x += vertex_morph.position_offset[0] * morph_weights_[i];
 			morph_vertics[vertex_morph.vertex_index].Position.y += vertex_morph.position_offset[1] * morph_weights_[i];
 			morph_vertics[vertex_morph.vertex_index].Position.z += vertex_morph.position_offset[2] * morph_weights_[i];
@@ -166,18 +163,18 @@ void MotionController::updateBoneAnimation()
 
 				s = MathUtil::bezier(T, param[0], param[4], param[8], param[12]);
 				//s = 1 - s;
-				skeleton_position[i].x = position0.x + (position1.x - position0.x)*s;
+				skeleton_position[i].x = position0.x + (position1.x - position0.x) * s;
 				s = MathUtil::bezier(T, param[1], param[5], param[9], param[13]);
 				//s = 1 - s;
-				skeleton_position[i].y = position0.y + (position1.y - position0.y)*s;
+				skeleton_position[i].y = position0.y + (position1.y - position0.y) * s;
 				s = MathUtil::bezier(T, param[2], param[6], param[10], param[14]);
 				//s = 1 - s;
-				skeleton_position[i].z = position0.z + (position1.z - position0.z)*s;
+				skeleton_position[i].z = position0.z + (position1.z - position0.z) * s;
 				//skeleton_position[i] = position0 + (position1 - position0)*T;
 
 				s = MathUtil::bezier(T, param[3], param[7], param[11], param[15]);
 				//s = 1 - s;
-				skeleton_rotation[i] = MathUtil::Slerp(rotation0, rotation1,s);
+				skeleton_rotation[i] = MathUtil::Slerp(rotation0, rotation1, s);
 				//skeleton_rotation[i] = rotation0;
 				if (ctime != t1) --bone_key_frames_itr_[i];
 			}
@@ -185,7 +182,89 @@ void MotionController::updateBoneAnimation()
 			{
 				skeleton_position[i] += bone.position - model_.bones[bone.parent_index].position;
 			}
-			skeleton_locals[i] = MathUtil::compose(skeleton_position[i])*MathUtil::compose(skeleton_rotation[i]);
+			skeleton_locals[i] = MathUtil::compose(skeleton_rotation[i]) * MathUtil::compose(skeleton_position[i]);
+		}
+	}
+	updateIK();
+}
+
+
+void MotionController::updateIK()
+{
+	XMVECTOR effector_position;
+	XMVECTOR target_position;
+
+	XMVECTOR local_effector_position;
+	XMVECTOR local_target_position;
+
+
+	for (size_t i = 0; i < model_.bone_count; i++)
+	{
+		auto const &IK_bone = model_.bones.get()[i];
+		if (IK_bone.bone_flag & 0x0020) // IK type
+		{
+			auto const &IK_bone_mat = (skeleton_matrix[i]);
+			auto const &target_bone = model_.bones.get()[IK_bone.target_index];
+
+			for (int loop_count = 0; loop_count < IK_bone.ik_loop; ++loop_count)
+			{
+				for (int attention_index = 0; attention_index < IK_bone.ik_link_count; ++attention_index)
+				{
+					auto const &link = IK_bone.ik_links.get()[attention_index];
+					//auto &link_bone = model_.bones.get()[link.link_target];
+
+					auto const &effector_mat = (skeleton_matrix[IK_bone.target_index]);
+					effector_position = effector_mat.r[3];
+					target_position = IK_bone_mat.r[3];
+
+					auto inv_coord = (XMMatrixInverse(nullptr, skeleton_matrix[link.link_target]));
+
+					local_effector_position = XMVector3Transform(effector_position, inv_coord);
+					local_target_position = XMVector3Transform(target_position, inv_coord);
+
+					auto local_effector_direction = XMVector3Normalize(local_effector_position);
+					auto local_target_direction = XMVector3Normalize(local_target_position);
+
+					float p = dot(local_effector_direction, local_target_direction);
+					if (p > 1 - 1e-6)
+						continue;
+					float angle = min(acos(p), IK_bone.ik_loop_angle_limit);
+
+					auto axis = XMVector3Cross(local_effector_direction, local_target_direction);
+					//if (XMVector3LengthSq(axis).m128_f32[0] < 1e-6)
+					//	break;
+					auto rotation = XMMatrixRotationAxis(axis, 180.0 / M_PI * angle);
+
+					//if (0)
+					if (link.angle_lock)
+					{
+						auto new_local = rotation * skeleton_locals[link.link_target];
+						auto new_euler = MathUtil::fromMatrixToEuler(new_local);
+						XMFLOAT3 low(link.min_radian);
+						XMFLOAT3 high(link.max_radian);
+
+
+						auto clamped_euler = XMVectorClamp(new_euler, XMLoadFloat3(&low), XMLoadFloat3(&high));
+						auto rotation_mat = XMMatrixRotationRollPitchYawFromVector(clamped_euler);
+
+						//XMVECTOR scal;// not used
+						//XMVECTOR quat;// not used
+						//XMVECTOR tran;
+						//XMMatrixDecompose(&scal, &quat, &tran, new_local);
+						auto translation = XMMatrixTranslation(skeleton_locals[link.link_target].r[3].m128_f32[0], skeleton_locals[link.link_target].r[3].m128_f32[1], skeleton_locals[link.link_target].r[3].m128_f32[2]);
+						skeleton_locals[link.link_target] = rotation_mat * translation;
+					}
+					else
+					{
+						skeleton_locals[link.link_target] = rotation * skeleton_locals[link.link_target];
+					}
+					updateChildSkeletonMatrix(link.link_target);
+				}
+				if (XMVector3LengthSq(local_effector_position - local_target_position).m128_f32[0] < 1e-6)
+				{
+					break;
+				}
+			}
 		}
 	}
 }
@@ -230,11 +309,11 @@ void MotionController::buildSkeletonTree()
 	}
 }
 
-void MotionController::calcMatrix(int i)
+void MotionController::updateChildSkeletonMatrix(int i)
 {
 	if (skeleton_tree_[i].parent >= 0)
 	{
-		skeleton_matrix[i] = skeleton_matrix[skeleton_tree_[i].parent] * skeleton_locals[i];
+		skeleton_matrix[i] = skeleton_locals[i] * skeleton_matrix[skeleton_tree_[i].parent];
 	}
 	else
 	{
@@ -242,6 +321,6 @@ void MotionController::calcMatrix(int i)
 	}
 	for (auto child : skeleton_tree_[i].childs)
 	{
-		calcMatrix(child);
+		updateChildSkeletonMatrix(child);
 	}
 }

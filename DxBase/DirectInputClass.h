@@ -36,4 +36,4 @@ private:
 };
 extern DirectInput* gDInput;
 
-#endif 
+#endif

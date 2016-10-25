@@ -2,8 +2,12 @@
 #include <DirectXMath.h>
 #include "math3d.h"
 
+#define M_PI 3.14159265358979323846
+
+
 namespace MathUtil
 {
+
 
 	inline float parBezFunc(float t, float p1, float p2) //parameterized Bezier Curve Function
 	{
@@ -58,7 +62,7 @@ namespace MathUtil
 			xz - wy, yz + wx, 1 - (xx + yy), 0,
 			0,0,0, 1);
 
-		return /*DirectX::XMMatrixTranspose*/(XMLoadFloat4x4(&mw));
+		return DirectX::XMMatrixTranspose(XMLoadFloat4x4(&mw));
 	}
 	inline DirectX::XMMATRIX compose(vec3 position)
 	{
@@ -67,7 +71,7 @@ namespace MathUtil
 			0, 0, 1, 0,
 			position.x, position.y, position.z, 1);
 
-		return DirectX::XMMatrixTranspose(XMLoadFloat4x4(&mw));
+		return /*DirectX::XMMatrixTranspose*/(XMLoadFloat4x4(&mw));
 	}
 	float bezier(float X, float x1, float y1, float x2, float y2);
 
@@ -100,5 +104,25 @@ namespace MathUtil
 		v2 = normalize(v2);
 
 		return v0*cos(theta) + v2*sin(theta);
+	}
+
+	inline DirectX::XMVECTOR fromMatrixToEuler(const DirectX::XMMATRIX &m) {// Setup the Euler angles, given a rotation matrix.
+		float pitch, heading, bank;
+		float	sp = -m.r[1].m128_f32[2];// Extract sin(pitch) from _23.
+		if (fabs(sp) > 9.99999f) {// Check for Gimbel lock
+			pitch = M_PI/2 * sp;// Looking straight up or down
+			heading = atan2(-m.r[2].m128_f32[0], m.r[0].m128_f32[0]);// Compute heading, slam bank to zero
+			bank = 0.0f;
+		}
+		else {
+			heading = atan2(m.r[0].m128_f32[2], m.r[2].m128_f32[2]);
+			pitch = asin(sp);
+			bank = atan2(m.r[1].m128_f32[0], m.r[1].m128_f32[1]);
+		}
+		DirectX::XMVECTOR result;
+		result.m128_f32[0] = pitch;
+		result.m128_f32[1] = heading;
+		result.m128_f32[2] = bank;
+		return result;
 	}
 }

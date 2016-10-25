@@ -122,10 +122,10 @@ PSInput VS(VSInput input)
 
     // Store the texture coordinates for the pixel shader.
     output.tex = input.tex;
-	output.color.x = w1;
-	output.color.y = w2;
-	output.color.z = w3;
-	output.color.w = w4;
+	output.color.x = i1[3][0];
+	output.color.y = i1[3][1];
+	output.color.z = i1[3][2];
+	output.color.w = i1[3][3];
     // Calculate the normal vector against the world matrix only.
     //output.normal = mul(input.normal, (float3x3)World);
 

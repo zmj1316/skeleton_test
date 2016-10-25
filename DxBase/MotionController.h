@@ -4,7 +4,6 @@
 #include <list>
 #include "mathUtil.h"
 #include "GeometryData.h"
-
 class MotionController
 {
 public:
@@ -34,6 +33,7 @@ public:
 
 	void updateMorphAnimation(const std::vector<MyMeshData::Vertex>&, std::vector<MyMeshData::Vertex>&);
 	void updateBoneAnimation();
+	void updateIK();
 	std::vector<DirectX::XMMATRIX> skeleton_matrix;
 
 	struct TreeNode
@@ -43,7 +43,7 @@ public:
 	};
 	void advanceTime()
 	{
-		ctime++;
+		ctime += 1;
 	}
 	int bone_count_;
 	int morph_count_;
@@ -69,5 +69,5 @@ private:
 	int root_index_;
 	void allocVectors();
 	void buildSkeletonTree();
-	void calcMatrix(int i);
+	void updateChildSkeletonMatrix(int i);
 };

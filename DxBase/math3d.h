@@ -12,6 +12,7 @@
 #include <limits>
 #include <algorithm>
 #include <stdexcept>
+#include <xmmintrin.h>
 #ifdef _MSC_VER
 #include <float.h>
 #endif
@@ -118,7 +119,7 @@ struct vec4 {
     vec4(vec3 const& v, real_t w):x(v.x), y(v.y), z(v.z), w(w){}
     vec4(vec2 const& v, real_t z, real_t w):x(v.x), y(v.y), z(z), w(w){}
     vec4(real_t x, real_t y, real_t z, real_t w):x(x), y(y), z(z), w(w){}
-
+	vec4(__m128 m) :x(m.m128_f32[0]), y(m.m128_f32[1]), z(m.m128_f32[2]), w(m.m128_f32[3]){}
     real_t lengthSquared() const                      { return x*x + y*y + z*z + w*w; }
     real_t length() const                             { return std::sqrt(lengthSquared()); }
     real_t dot(vec4 const& v) const                   { return x*v.x + y*v.y + z*v.z + w*v.w; }
@@ -576,6 +577,7 @@ struct mat4 {
         m[2][0] = _20; m[2][1] = _21; m[2][2] = _22; m[2][3] = _23;
         m[3][0] = _30; m[3][1] = _31; m[3][2] = _32; m[3][3] = _33;
     }
+
     static mat4 identity() {
         return mat4(1.f, 0.f, 0.f, 0.f,
                     0.f, 1.f, 0.f, 0.f,
