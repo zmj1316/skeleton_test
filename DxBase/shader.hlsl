@@ -100,9 +100,9 @@ PSInput VS(VSInput input)
 		float3 d2 = position.xyz - rc.xyz;
 		float r2 = dot(d2, d2);
 		output.position = position;
-		//if (r2 < r1) {
-		//	output.position.xyz = rc.xyz + d2*sqrt(r1 / r2);
-		//}
+		if (r2 < r1) {
+			output.position.xyz = rc.xyz + d2*sqrt(r1 / r2);
+		}
 	}
 	else {
 

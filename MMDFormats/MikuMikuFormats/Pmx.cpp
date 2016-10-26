@@ -204,15 +204,15 @@ namespace pmx
 		stream->read((char*) &this->angle_lock, sizeof(uint8_t));
 		if (angle_lock == 1)
 		{
-			stream->read((char*) this->max_radian, sizeof(float) * 3);
 			stream->read((char*) this->min_radian, sizeof(float) * 3);
-			for (int i = 0; i < 3; ++i)
-			{
-				if (max_radian[i] > 3.14) max_radian[i] -= 3.14;
-				if (min_radian[i] > 3.14) min_radian[i] -= 3.14;
-				if (max_radian[i] < min_radian[i])
-					std::swap(max_radian[i], min_radian[i]);
-			}
+			stream->read((char*) this->max_radian, sizeof(float) * 3);
+			//for (int i = 0; i < 3; ++i)
+			//{
+			//	if (max_radian[i] < -3.14) { max_radian[i] += 2 * 3.14f; min_radian[i] += 2 * 3.14f; }
+			//	//if (min_radian[i] > 3.14) min_radian[i] -= 3.14;
+			//	if (max_radian[i] < min_radian[i])
+			//		std::swap(max_radian[i], min_radian[i]);
+			//}
 		}
 	}
 

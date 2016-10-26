@@ -60,7 +60,7 @@ void XTest::OnInit()
 
 	// Load Model
 
-	motion_controller_.LoadModel(L"..\\data\\tda2\\", L"tda.pmx", L"tda2.vmd");
+	motion_controller_.LoadModel(L"..\\data\\tda2\\", L"tda2.pmx", L"tda2.vmd");
 
 
 	//std::vector<MyMeshData::Vertex> model_vertices_;
@@ -262,7 +262,7 @@ void XTest::OnUpdate()
 	constant_buffer_.mDirLight = dir_light_;
 	constant_buffer_.mMaterial = material_;
 	constant_buffer_.mEyeW = XMFLOAT3(20.0f, 20.0f, 20.0f);
-	for (int i = 0; i < motion_controller_.skeleton_matrix.size(); ++i)
+	for (auto i = 0; i < motion_controller_.skeleton_matrix.size(); ++i)
 	{
 		constant_buffer_.skeleton[i] = XMMatrixTranspose(motion_controller_.skeleton_matrix[i]);
 	}

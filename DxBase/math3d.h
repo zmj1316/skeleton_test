@@ -12,7 +12,7 @@
 #include <limits>
 #include <algorithm>
 #include <stdexcept>
-#include <xmmintrin.h>
+//#include <xmmintrin.h>
 #ifdef _MSC_VER
 #include <float.h>
 #endif
