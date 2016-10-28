@@ -34,6 +34,7 @@ public:
 	void updateMorphAnimation(const std::vector<MyMeshData::Vertex>&, std::vector<MyMeshData::Vertex>&);
 	void updateBoneAnimation();
 	void updateIK();
+	void updateIK_FABRIK();
 	std::vector<DirectX::XMMATRIX> skeleton_matrix;
 
 	struct TreeNode

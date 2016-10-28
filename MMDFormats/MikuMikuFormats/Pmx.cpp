@@ -109,11 +109,6 @@ namespace pmx
 		stream->read((char*) &this->bone_weight2, sizeof(float));
 		stream->read((char*) &this->bone_weight3, sizeof(float));
 		stream->read((char*) &this->bone_weight4, sizeof(float));
-		if (bone_weight1 + bone_weight2 + bone_weight3 + bone_weight4 > 1.001 || bone_weight1 + bone_weight2 + bone_weight3 + bone_weight4 < 0.99)
-		{
-			std::cout <<  "FUVK"
-			;
-		}
 	}
 
 	void PmxVertexSkinningSDEF::Read(std::istream *stream, PmxSetting *setting)
@@ -206,6 +201,7 @@ namespace pmx
 		{
 			stream->read((char*) this->min_radian, sizeof(float) * 3);
 			stream->read((char*) this->max_radian, sizeof(float) * 3);
+			
 			//for (int i = 0; i < 3; ++i)
 			//{
 			//	if (max_radian[i] < -3.14) { max_radian[i] += 2 * 3.14f; min_radian[i] += 2 * 3.14f; }

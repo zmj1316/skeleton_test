@@ -120,9 +120,28 @@ namespace MathUtil
 			bank = atan2(m.r[1].m128_f32[0], m.r[1].m128_f32[1]);
 		}
 		DirectX::XMVECTOR result;
+		result.m128_f32[2] = bank;
 		result.m128_f32[0] = pitch;
 		result.m128_f32[1] = heading;
-		result.m128_f32[2] = bank;
+		return result;
+	}
+
+	inline DirectX::XMVECTOR fromMatrixToEuler2(DirectX::XMMATRIX &m) {// Setup the Euler angles, given a rotation matrix.
+		float yaw, pitch, roll;
+		DirectX::XMVECTOR s, r, t;
+		DirectX::XMMatrixDecompose(&s, &r, &t, m);
+		auto x = r.m128_f32[0];
+		auto y = r.m128_f32[1];
+		auto z = r.m128_f32[2];
+		auto w = r.m128_f32[3];
+		roll = atan2(2 * (w*z + x*y) , (1 - 2 * (x*x + z*z)));
+		pitch = asin(clamp(2 * (w*x - y * z),-1,1));
+		yaw = atan2(2 * (w*y + x*z) , (1 - 2 * (x*x + y*y)));
+
+		DirectX::XMVECTOR result;
+		result.m128_f32[0] = roll;
+		result.m128_f32[1] = pitch;
+		result.m128_f32[2] = yaw;
 		return result;
 	}
 }

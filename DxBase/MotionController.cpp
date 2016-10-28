@@ -97,8 +97,6 @@ bool MotionController::LoadModel(std::wstring model_base, std::wstring pmx_name,
 
 void MotionController::updateMatrix()
 {
-	updateChildSkeletonMatrix(root_index_);
-	updateIK();
 	for (int i = 0; i < bone_count_; ++i)
 	{
 		skeleton_matrix[i] = inv_position[i] * skeleton_matrix[i];
@@ -184,6 +182,8 @@ void MotionController::updateBoneAnimation()
 			skeleton_locals[i] = MathUtil::compose(skeleton_rotation[i]) * MathUtil::compose(skeleton_position[i]);
 		}
 	}
+	updateChildSkeletonMatrix(root_index_);
+	updateIK();
 }
 
 
@@ -206,10 +206,10 @@ void MotionController::updateIK()
 
 			for (int loop_count = 0; loop_count < IK_bone.ik_loop; ++loop_count)
 			{
-				for (int attention_index = 0; attention_index < IK_bone.ik_link_count; ++attention_index)
+				for (int attention_index = IK_bone.ik_link_count - 1; attention_index >= 0; --attention_index)
 				{
 					auto const &link = IK_bone.ik_links.get()[attention_index];
-					//auto &link_bone = model_.bones.get()[link.link_target];
+					auto &link_bone = model_.bones.get()[link.link_target];
 
 					auto const &effector_mat = (skeleton_matrix[IK_bone.ik_target_bone_index]);
 					effector_position = effector_mat.r[3];
@@ -227,33 +227,30 @@ void MotionController::updateIK()
 					if (p > 1 - 1e-6)
 						continue;
 					float angle = acos(p);
+					//angle = min(acos(p),acos(p));
 					angle = min(acos(p), IK_bone.ik_loop_angle_limit);
 
 					auto axis = -XMVector3Cross(local_target_direction, local_effector_direction);
-					if (XMVector3LengthSq(axis).m128_f32[0] < 1e-6)
-						continue;
+					//if (XMVector3LengthSq(axis).m128_f32[0] < 1e-6)
+					//	continue;
 					auto rotation = XMMatrixRotationAxis(axis, (float)angle);
 
 					//if (0)
 					if (link.angle_lock)
 					{
 						auto new_local = rotation * skeleton_locals[link.link_target];
-						auto new_euler = MathUtil::fromMatrixToEuler(new_local);
+						auto new_euler = MathUtil::fromMatrixToEuler2(new_local);
 						XMFLOAT3 low(link.min_radian);
 						XMFLOAT3 high(link.max_radian);
-
-
+						//low.x -= 0.5;
+						//low.y -= 0.5;
+						//low.z = 0;
+						//high.x += 0.5;
+						//high.y += 0.5;
+						//high.z = 0;
 						auto clamped_euler = XMVectorClamp(new_euler, XMLoadFloat3(&low), XMLoadFloat3(&high));
 
-						auto old_euler = MathUtil::fromMatrixToEuler(skeleton_locals[link.link_target]);
-						clamped_euler = (clamped_euler + old_euler*31) / 32;
-
-						auto rotation_mat = XMMatrixRotationRollPitchYawFromVector(clamped_euler);
-
-						//XMVECTOR scal;// not used
-						//XMVECTOR quat;// not used
-						//XMVECTOR tran;
-						//XMMatrixDecompose(&scal, &quat, &tran, new_local);
+						auto rotation_mat = XMMatrixRotationRollPitchYawFromVector(new_euler);
 						auto translation = XMMatrixTranslation(skeleton_locals[link.link_target].r[3].m128_f32[0], skeleton_locals[link.link_target].r[3].m128_f32[1], skeleton_locals[link.link_target].r[3].m128_f32[2]);
 						skeleton_locals[link.link_target] = rotation_mat * translation;
 					}
@@ -268,6 +265,69 @@ void MotionController::updateIK()
 					break;
 				}
 			}
+		}
+	}
+}
+
+void MotionController::updateIK_FABRIK()
+{
+	XMVECTOR effector_position;
+	XMVECTOR target_position;
+
+	XMVECTOR local_effector_position;
+	XMVECTOR local_target_position;
+
+
+	for (auto i = 0; i < model_.bone_count; i++)
+	{
+		auto const &IK_bone = model_.bones.get()[i];
+		if (IK_bone.bone_flag & 0x0020) // IK type
+		{
+			auto &IK_bone_mat = (skeleton_matrix[i]);
+			auto &target_bone = model_.bones.get()[IK_bone.ik_target_bone_index];
+			auto &target_bone_mat = skeleton_matrix[IK_bone.ik_target_bone_index];
+
+			int max_reach = 0;
+			auto root_mat = skeleton_matrix[IK_bone.ik_links.get()[0].link_target];
+
+			// out of max reach detect
+			//auto previous_mat = root_mat;
+			//for (int attention_index = 1; attention_index < IK_bone.ik_link_count; ++attention_index)
+			//{
+			//	auto const &link = IK_bone.ik_links.get()[attention_index];
+			//	auto this_mat = skeleton_matrix[link.link_target];
+			//	auto distance = this_mat.r[3] - previous_mat.r[3];
+			//	max_reach += XMVector3Length(distance).m128_f32[0];
+			//	previous_mat = this_mat;
+			//}
+
+			//auto root_to_target_distance_sq = XMVector3LengthSq(root_mat.r[3] - IK_bone_mat.r[3]).m128_f32[0];
+			//if (root_to_target_distance_sq > max_reach * max_reach)
+			//{
+			//	
+			//}
+
+			float slop = XMVector3Length(target_bone_mat.r[3] - IK_bone_mat.r[3]).m128_f32[0];
+			if(slop > 1e-3)
+			{
+				target_bone_mat.r[3] = IK_bone_mat.r[3];
+
+				int loop_count = 0;
+				while (slop > 1e-3 && loop_count++ < IK_bone.ik_loop)
+				{
+					auto links = IK_bone.ik_links.get();
+					for (int link_index = IK_bone.ik_link_count - 2; link_index > 0; --link_index)
+					{
+						auto &current_link = skeleton_matrix[links[link_index].link_target];
+						auto &next_link = skeleton_matrix[links[link_index].link_target + 1];
+
+						
+					}
+				}
+				
+			}
+
+		
 		}
 	}
 }
@@ -314,22 +374,35 @@ void MotionController::buildSkeletonTree()
 
 void MotionController::updateChildSkeletonMatrix(int i)
 {
+	if (model_.bones.get()[i].grant_weight > 0)
+	{
+		if (model_.bones.get()[i].bone_flag & 0x0100)
+		{
+			auto tmp = skeleton_locals[i].r[3];
+			skeleton_locals[i] = model_.bones.get()[i].grant_weight * skeleton_locals[model_.bones.get()[i].grant_parent_index] + (1 - model_.bones.get()[i].grant_weight) * skeleton_locals[i];
+			skeleton_locals[i].r[3] = tmp;
+		}
+		else
+		{
+			skeleton_locals[i].r[3] = model_.bones.get()[i].grant_weight * skeleton_locals[model_.bones.get()[i].grant_parent_index].r[3] + (1 - model_.bones.get()[i].grant_weight) * skeleton_locals[i].r[3];
+		}
+	}
 	if (skeleton_tree_[i].parent >= 0)
 	{
 		skeleton_matrix[i] = skeleton_locals[i] * skeleton_matrix[skeleton_tree_[i].parent];
-		if(model_.bones.get()[i].grant_weight > 0)
-		{
-			if(model_.bones.get()[i].bone_flag & 0x0100)
-			{
-				auto tmp = skeleton_matrix[i].r[3];
-				skeleton_matrix[i] = model_.bones.get()[i].grant_weight * skeleton_matrix[model_.bones.get()[i].grant_parent_index] + (1 - model_.bones.get()[i].grant_weight) * skeleton_matrix[i];
-				skeleton_matrix[i].r[3] = tmp;
-			}
-			else
-			{
+		//if(model_.bones.get()[i].grant_weight > 0)
+		//{
+		//	if(model_.bones.get()[i].bone_flag & 0x0100)
+		//	{
+		//		auto tmp = skeleton_matrix[i].r[3];
+		//		skeleton_matrix[i] = model_.bones.get()[i].grant_weight * skeleton_matrix[model_.bones.get()[i].grant_parent_index] + (1 - model_.bones.get()[i].grant_weight) * skeleton_matrix[i];
+		//		skeleton_matrix[i].r[3] = tmp;
+		//	}
+		//	else
+		//	{
 
-			}
-		}
+		//	}
+		//}
 	}
 	else
 	{

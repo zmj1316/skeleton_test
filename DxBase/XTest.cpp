@@ -177,8 +177,8 @@ void XTest::OnInit()
 	world_m_ = XMMatrixIdentity();
 
 	// Initialize the view matrix
-	XMVECTOR Eye = XMVectorSet(2.0f, 2.0f, 20.0f, 0.0f);
-	XMVECTOR At = XMVectorSet(0.0f, 10.0f, 0.0f, 0.0f);
+	XMVECTOR Eye = XMVectorSet(2.0f, 2.0f, 30.0f, 0.0f);
+	XMVECTOR At = XMVectorSet(0.0f, 2.0f, 0.0f, 0.0f);
 	XMVECTOR Up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 	//view_m_ = XMMatrixLookAtLH(Eye, At, Up);
 	origin = Camera(Eye, At, Up);
@@ -213,6 +213,7 @@ void XTest::OnInit()
 
 	// Create the texture sampler state.
 	hr = _pd3dDevice->CreateSamplerState(&samplerDesc, &sample_state_d3dptr_);
+#pragma openmp parallel for
 	for (int i = 0; i < model.texture_count; ++i)
 	{
 		auto path = motion_controller_.getBasePath() + model.textures.get()[i];
@@ -220,6 +221,7 @@ void XTest::OnInit()
 			path.replace(path.size() - 3, 3, L"dds");
 		ID3D11ShaderResourceView *tmp;
 		hr = D3DX11CreateShaderResourceViewFromFile(_pd3dDevice, path.c_str(), NULL, NULL, &tmp, NULL);
+#pragma omp critical
 		if (FAILED(hr))
 			texture_array.push_back(nullptr);
 		else
@@ -251,11 +253,18 @@ void XTest::OnUpdate()
 
 	camera_ptr_->update(t);
 	//update camera
-	if (g_pause || gDInput->keyDown(DIK_LEFT))
+	if (g_pause && !gDInput->keyDown(DIK_Z))
 	{
-		if (t >= 1 / 30.0f)
+		if (t >= 1 / 60.0f)
 		{
 			motion_controller_.advanceTime();
+#ifdef _DEBUG
+			motion_controller_.advanceTime();
+			motion_controller_.advanceTime();
+			motion_controller_.advanceTime();
+
+#endif
+
 			dwTimeStart = dwTimeCur;
 		}
 	}
@@ -318,7 +327,7 @@ void XTest::OnRender()
 		total_index += model.materials.get()[i].index_count;
 	}
 
-	_pSwapChain->Present(1, 0);
+	_pSwapChain->Present(0, 0);
 }
 
 
