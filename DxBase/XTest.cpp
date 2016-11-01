@@ -177,8 +177,8 @@ void XTest::OnInit()
 	world_m_ = XMMatrixIdentity();
 
 	// Initialize the view matrix
-	XMVECTOR Eye = XMVectorSet(2.0f, 2.0f, 30.0f, 0.0f);
-	XMVECTOR At = XMVectorSet(0.0f, 2.0f, 0.0f, 0.0f);
+	XMVECTOR Eye = XMVectorSet(2.0f, 15.0f, 30.0f, 0.0f);
+	XMVECTOR At = XMVectorSet(0.0f, 12.0f, 0.0f, 0.0f);
 	XMVECTOR Up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 	//view_m_ = XMMatrixLookAtLH(Eye, At, Up);
 	origin = Camera(Eye, At, Up);
@@ -258,12 +258,12 @@ void XTest::OnUpdate()
 		if (t >= 1 / 60.0f)
 		{
 			motion_controller_.advanceTime();
-#ifdef _DEBUG
-			motion_controller_.advanceTime();
-			motion_controller_.advanceTime();
-			motion_controller_.advanceTime();
-
-#endif
+//#ifdef _DEBUG
+//			motion_controller_.advanceTime();
+//			motion_controller_.advanceTime();
+//			motion_controller_.advanceTime();
+//
+//#endif
 
 			dwTimeStart = dwTimeCur;
 		}

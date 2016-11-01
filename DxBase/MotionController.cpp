@@ -1,6 +1,7 @@
 #include "MotionController.h"
 #include "mathUtil.h"
 #include "../MMDFormats/MikuMikuFormats/Pmd.h"
+#include "pugixml.hpp"
 
 MotionController::~MotionController()
 {
@@ -26,6 +27,7 @@ bool MotionController::LoadModel(std::wstring model_base, std::wstring pmx_name,
 	stream.close();
 	vstream.close();
 	buildSkeletonTree();
+	//dumpSkeletonTree("visual.txt");
 	int match_count = 0;
 	const auto &bone_frames = motion_ptr->bone_frames;
 	auto model_bone_arr = model_.bones.get();
@@ -186,6 +188,30 @@ void MotionController::updateBoneAnimation()
 	updateIK();
 }
 
+//inline XMVECTOR _Clamp(XMVECTOR r, XMVECTOR low, XMVECTOR up)
+//{
+//	XMVECTOR res = r;
+//	for (int i = 0; i < 3; ++i)
+//	{
+//		if(r.m128_f32[i] < low.m128_f32[i])
+//		{
+//			float num = 2.0f * low.m128_f32[i] - r.m128_f32[i];
+//			if (num <= up.m128_f32[i])
+//				res.m128_f32[i] = num;
+//			else
+//				res.m128_f32[i] = low.m128_f32[i];
+//		}
+//		if(r.m128_f32[i] > up.m128_f32[i])
+//		{
+//			float num = 2.0f * up.m128_f32[i] - r.m128_f32[i];
+//			if (num >= low.m128_f32[i])
+//				res.m128_f32[i] = num;
+//			else
+//				res.m128_f32[i] = up.m128_f32[i];
+//		}
+//	}
+//	return res;
+//}
 
 void MotionController::updateIK()
 {
@@ -206,6 +232,7 @@ void MotionController::updateIK()
 
 			for (int loop_count = 0; loop_count < IK_bone.ik_loop; ++loop_count)
 			{
+				//for (int attention_index = 0; attention_index < IK_bone.ik_link_count; ++attention_index)
 				for (int attention_index = IK_bone.ik_link_count - 1; attention_index >= 0; --attention_index)
 				{
 					auto const &link = IK_bone.ik_links.get()[attention_index];
@@ -224,7 +251,7 @@ void MotionController::updateIK()
 					auto local_target_direction = XMVector3Normalize(XMVector4Normalize(local_target_position));
 
 					float p = XMVector3Dot(local_effector_direction, local_target_direction).m128_f32[0];
-					if (p > 1 - 1e-6)
+					if (p > 1 - 1e-6 || p < 1e-6 - 1)
 						continue;
 					float angle = acos(p);
 					//angle = min(acos(p),acos(p));
@@ -240,25 +267,57 @@ void MotionController::updateIK()
 					{
 						auto new_local = rotation * skeleton_locals[link.link_target];
 						auto new_euler = MathUtil::fromMatrixToEuler2(new_local);
+						//auto new_euler = MathUtil::fromMatrixToEuler2(new_local);
+						//if(loop_count < 2)
+						//{
+						//	new_euler.m128_f32[0] -= 1;
+						//}
+
 						XMFLOAT3 low(link.min_radian);
 						XMFLOAT3 high(link.max_radian);
+						if(low.x < -M_PI/2)
+						{
+							//auto clamped_euler = _Clamp(new_euler, XMLoadFloat3(&low), XMLoadFloat3(&high));
+
+							//clamped_euler = new_euler;
+							skeleton_locals[link.link_target] = rotation * skeleton_locals[link.link_target];
+							//auto rotation_mat = XMMatrixRotationX(clamped_euler.m128_f32[0]) * XMMatrixRotationY(clamped_euler.m128_f32[1]) * XMMatrixRotationZ(clamped_euler.m128_f32[2]);
+							//auto translation = XMMatrixTranslation(skeleton_locals[link.link_target].r[3].m128_f32[0], skeleton_locals[link.link_target].r[3].m128_f32[1], skeleton_locals[link.link_target].r[3].m128_f32[2]);
+							//skeleton_locals[link.link_target] = rotation_mat * translation;
+						}
+						else
+						{
+							auto clamped_euler = XMVectorClamp(new_euler, XMLoadFloat3(&low), XMLoadFloat3(&high));
+
+							//clamped_euler = new_euler;
+
+							//auto rotation_mat = XMMatrixRotationX(clamped_euler.m128_f32[0]) * XMMatrixRotationY(clamped_euler.m128_f32[1]) * XMMatrixRotationZ(clamped_euler.m128_f32[2]);
+							auto rotation_mat = XMMatrixRotationRollPitchYawFromVector(clamped_euler);
+							auto translation = XMMatrixTranslation(skeleton_locals[link.link_target].r[3].m128_f32[0], skeleton_locals[link.link_target].r[3].m128_f32[1], skeleton_locals[link.link_target].r[3].m128_f32[2]);
+							skeleton_locals[link.link_target] = rotation_mat * translation;
+						}
 						//low.x -= 0.5;
 						//low.y -= 0.5;
 						//low.z = 0;
 						//high.x += 0.5;
 						//high.y += 0.5;
 						//high.z = 0;
-						auto clamped_euler = XMVectorClamp(new_euler, XMLoadFloat3(&low), XMLoadFloat3(&high));
-
-						auto rotation_mat = XMMatrixRotationRollPitchYawFromVector(new_euler);
-						auto translation = XMMatrixTranslation(skeleton_locals[link.link_target].r[3].m128_f32[0], skeleton_locals[link.link_target].r[3].m128_f32[1], skeleton_locals[link.link_target].r[3].m128_f32[2]);
-						skeleton_locals[link.link_target] = rotation_mat * translation;
 					}
 					else
 					{
 						skeleton_locals[link.link_target] = rotation * skeleton_locals[link.link_target];
 					}
 					updateChildSkeletonMatrix(root_index_);
+					//{
+					//	auto const &effector_mat = (skeleton_matrix[IK_bone.ik_target_bone_index]);
+					//	effector_position = effector_mat.r[3];
+					//	target_position = IK_bone_mat.r[3];
+
+					//	auto inv_coord = (XMMatrixInverse(nullptr, skeleton_matrix[link.link_target]));
+
+					//	local_effector_position = XMVector4Transform(effector_position, inv_coord);
+					//	local_target_position = XMVector4Transform(target_position, inv_coord);
+					//}
 				}
 				if (XMVector3LengthSq(IK_bone_mat.r[3] - skeleton_matrix[IK_bone.ik_target_bone_index].r[3]).m128_f32[0] < 1e-6)
 				{
@@ -269,68 +328,65 @@ void MotionController::updateIK()
 	}
 }
 
-void MotionController::updateIK_FABRIK()
-{
-	XMVECTOR effector_position;
-	XMVECTOR target_position;
+//void MotionController::updateIK_FABRIK()
+//{
+//	XMVECTOR effector_position;
+//	XMVECTOR target_position;
+//
+//	XMVECTOR local_effector_position;
+//	XMVECTOR local_target_position;
+//
+//
+//	for (auto i = 0; i < model_.bone_count; i++)
+//	{
+//		auto const &IK_bone = model_.bones.get()[i];
+//		if (IK_bone.bone_flag & 0x0020) // IK type
+//		{
+//			auto &IK_bone_mat = (skeleton_matrix[i]);
+//			auto &target_bone = model_.bones.get()[IK_bone.ik_target_bone_index];
+//			auto &target_bone_mat = skeleton_matrix[IK_bone.ik_target_bone_index];
+//
+//			int max_reach = 0;
+//			auto root_mat = skeleton_matrix[IK_bone.ik_links.get()[0].link_target];
+//
+//			// out of max reach detect
+//			//auto previous_mat = root_mat;
+//			//for (int attention_index = 1; attention_index < IK_bone.ik_link_count; ++attention_index)
+//			//{
+//			//	auto const &link = IK_bone.ik_links.get()[attention_index];
+//			//	auto this_mat = skeleton_matrix[link.link_target];
+//			//	auto distance = this_mat.r[3] - previous_mat.r[3];
+//			//	max_reach += XMVector3Length(distance).m128_f32[0];
+//			//	previous_mat = this_mat;
+//			//}
+//
+//			//auto root_to_target_distance_sq = XMVector3LengthSq(root_mat.r[3] - IK_bone_mat.r[3]).m128_f32[0];
+//			//if (root_to_target_distance_sq > max_reach * max_reach)
+//			//{
+//			//	
+//			//}
+//
+//			float slop = XMVector3Length(target_bone_mat.r[3] - IK_bone_mat.r[3]).m128_f32[0];
+//			if (slop > 1e-3)
+//			{
+//				target_bone_mat.r[3] = IK_bone_mat.r[3];
+//
+//				int loop_count = 0;
+//				while (slop > 1e-3 && loop_count++ < IK_bone.ik_loop)
+//				{
+//					auto links = IK_bone.ik_links.get();
+//					for (int link_index = IK_bone.ik_link_count - 2; link_index > 0; --link_index)
+//					{
+//						auto &current_link = skeleton_matrix[links[link_index].link_target];
+//						auto &next_link = skeleton_matrix[links[link_index].link_target + 1];
+//					}
+//				}
+//			}
+//		}
+//	}
+//}
 
-	XMVECTOR local_effector_position;
-	XMVECTOR local_target_position;
 
-
-	for (auto i = 0; i < model_.bone_count; i++)
-	{
-		auto const &IK_bone = model_.bones.get()[i];
-		if (IK_bone.bone_flag & 0x0020) // IK type
-		{
-			auto &IK_bone_mat = (skeleton_matrix[i]);
-			auto &target_bone = model_.bones.get()[IK_bone.ik_target_bone_index];
-			auto &target_bone_mat = skeleton_matrix[IK_bone.ik_target_bone_index];
-
-			int max_reach = 0;
-			auto root_mat = skeleton_matrix[IK_bone.ik_links.get()[0].link_target];
-
-			// out of max reach detect
-			//auto previous_mat = root_mat;
-			//for (int attention_index = 1; attention_index < IK_bone.ik_link_count; ++attention_index)
-			//{
-			//	auto const &link = IK_bone.ik_links.get()[attention_index];
-			//	auto this_mat = skeleton_matrix[link.link_target];
-			//	auto distance = this_mat.r[3] - previous_mat.r[3];
-			//	max_reach += XMVector3Length(distance).m128_f32[0];
-			//	previous_mat = this_mat;
-			//}
-
-			//auto root_to_target_distance_sq = XMVector3LengthSq(root_mat.r[3] - IK_bone_mat.r[3]).m128_f32[0];
-			//if (root_to_target_distance_sq > max_reach * max_reach)
-			//{
-			//	
-			//}
-
-			float slop = XMVector3Length(target_bone_mat.r[3] - IK_bone_mat.r[3]).m128_f32[0];
-			if(slop > 1e-3)
-			{
-				target_bone_mat.r[3] = IK_bone_mat.r[3];
-
-				int loop_count = 0;
-				while (slop > 1e-3 && loop_count++ < IK_bone.ik_loop)
-				{
-					auto links = IK_bone.ik_links.get();
-					for (int link_index = IK_bone.ik_link_count - 2; link_index > 0; --link_index)
-					{
-						auto &current_link = skeleton_matrix[links[link_index].link_target];
-						auto &next_link = skeleton_matrix[links[link_index].link_target + 1];
-
-						
-					}
-				}
-				
-			}
-
-		
-		}
-	}
-}
 
 void MotionController::allocVectors()
 {
@@ -390,19 +446,6 @@ void MotionController::updateChildSkeletonMatrix(int i)
 	if (skeleton_tree_[i].parent >= 0)
 	{
 		skeleton_matrix[i] = skeleton_locals[i] * skeleton_matrix[skeleton_tree_[i].parent];
-		//if(model_.bones.get()[i].grant_weight > 0)
-		//{
-		//	if(model_.bones.get()[i].bone_flag & 0x0100)
-		//	{
-		//		auto tmp = skeleton_matrix[i].r[3];
-		//		skeleton_matrix[i] = model_.bones.get()[i].grant_weight * skeleton_matrix[model_.bones.get()[i].grant_parent_index] + (1 - model_.bones.get()[i].grant_weight) * skeleton_matrix[i];
-		//		skeleton_matrix[i].r[3] = tmp;
-		//	}
-		//	else
-		//	{
-
-		//	}
-		//}
 	}
 	else
 	{
@@ -413,3 +456,36 @@ void MotionController::updateChildSkeletonMatrix(int i)
 		updateChildSkeletonMatrix(child);
 	}
 }
+
+void MotionController::dumpSkeletonTree(std::string file_name)
+{
+	pugi::xml_document dump_doc;
+	auto root_node = dump_doc.append_child(pugi::node_element);
+	root_node.set_name("root");
+	dumpChildSkeletonNodes(root_index_, root_node);
+
+	dump_doc.save_file(file_name.c_str());
+	exit(1);
+}
+
+void MotionController::dumpChildSkeletonNodes(int bone_index, pugi::xml_node &xmlnode)
+{
+	auto &this_bone = model_.bones.get()[bone_index];
+	auto this_node = xmlnode.append_child("node");
+	auto identifier_node = this_node.append_child("identifier").text() = "\tidentifier_text\t";
+	//identifier_node.set_name("identifier");
+	//identifier_node.set_value("test");
+	auto transform_node = this_node.append_child("transform");
+	pugi::char_t buffer[MAX_ROW_CHAR_COUNT];
+	auto translation = skeleton_locals[bone_index].r[3].m128_f32;
+	sprintf_s(buffer, "\t%f %f %f\t", translation[0], translation[1], translation[2]);
+	transform_node.append_child("row0").text() = buffer;
+	transform_node.append_child("row1");
+	transform_node.append_child("row2");
+	transform_node.append_child("row3");
+	for (auto child : skeleton_tree_[bone_index].childs)
+	{
+		dumpChildSkeletonNodes(child, this_node);
+	}
+}
+

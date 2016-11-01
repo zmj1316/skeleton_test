@@ -4,10 +4,18 @@
 #include <list>
 #include "mathUtil.h"
 #include "GeometryData.h"
+
+const int MAX_ROW_CHAR_COUNT = 50;
+
+namespace pugi
+{
+	class xml_node;
+}
+
 class MotionController
 {
 public:
-	MotionController(): ctime(0),root_index_(-1)
+	MotionController(): ctime(0), root_index_(-1)
 	{
 	}
 
@@ -31,7 +39,7 @@ public:
 		return model_base_;
 	}
 
-	void updateMorphAnimation(const std::vector<MyMeshData::Vertex>&, std::vector<MyMeshData::Vertex>&);
+	void updateMorphAnimation(const std::vector<MyMeshData::Vertex> &, std::vector<MyMeshData::Vertex> &);
 	void updateBoneAnimation();
 	void updateIK();
 	void updateIK_FABRIK();
@@ -42,10 +50,14 @@ public:
 		int parent = -1;
 		std::vector<int> childs;
 	};
+
 	void advanceTime()
 	{
 		ctime += 1;
 	}
+
+	void dumpSkeletonTree(std::string file_name);
+
 	int bone_count_;
 	int morph_count_;
 private:
@@ -71,4 +83,6 @@ private:
 	void allocVectors();
 	void buildSkeletonTree();
 	void updateChildSkeletonMatrix(int i);
+
+	void dumpChildSkeletonNodes(int bone_index, pugi::xml_node &xmlnode);
 };
