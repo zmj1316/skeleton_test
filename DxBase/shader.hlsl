@@ -45,10 +45,10 @@ struct VSInput
 struct PSInput
 {
     float4 position : SV_POSITION;
-    float3 worldPos : POSITION;
+    float3 WorldPosition : POSITION;
     float2 tex : TEXCOORD0;
 	float4 color: COLOR;
-	//float3 normal : NORMAL;
+	float3 Normal : NORMAL;
 
     //float3 ViewDirection :   TEXCOORD1;
     //float3 LightDirection:   TEXCOORD2;
@@ -64,11 +64,12 @@ PSInput VS(VSInput input)
 
     float4 Pos = input.position;
     //output.position = mul(Pos, WorldViewProjection);
-    output.worldPos = mul(Pos, World).xyz;
+    output.WorldPosition = mul(Pos, World).xyz;
 
     matrix i1,i2,i3,i4;
     float w1,w2,w3,w4;
-    float4 p1,p2,p3,p4;
+	float4 p1, p2, p3, p4;
+	float4 n1, n2, n3, n4;
     // Change the position vector to be 4 units for proper matrix calculations.
     input.position.w = 1.0f;
 
@@ -79,10 +80,12 @@ PSInput VS(VSInput input)
     i4 = skeleton[input.index4];
     w1=input.weight1;
     p1=mul(input.position,i1);
+	n1 = mul(input.normal, i1);
     w2=input.weight2;
 	if (input.index3 < 0) {
 		w2 = 1 - input.weight1;
 		p2 = mul(input.position, i2);
+		n2 = mul(input.normal, i2);
 		float4 rc;
 		rc.x = input.weight2;
 		rc.y = input.weight3;
@@ -103,20 +106,30 @@ PSInput VS(VSInput input)
 		if (r2 < r1) {
 			output.position.xyz = rc.xyz + d2*sqrt(r1 / r2);
 		}
+
+
+
 	}
 	else {
 
-    p2=mul(input.position,i2);
-    w3 = input.weight3;
-    w4= input.weight4;
-    p3=mul(input.position,i3);
-    p4 = mul(input.position,i4);
+		p2 = mul(input.position, i2);
+		n2 = mul(input.normal, i2);
+
+		w3 = input.weight3;
+		w4 = input.weight4;
+		p3 = mul(input.position, i3);
+		n3 = mul(input.normal, i3);
+		p4 = mul(input.position, i4);
+		n4 = mul(input.normal, i4);
 	//output.position = Pos;
 	//output.position = p1;
 	//output.position = w1 * p1 + (1 - w1) * p2;
     output.position= (w1*p1+w2*p2+w3*p3+w4*p4);
+	output.Normal = (w1*n1 + w2 * n2 + w3*n3 + w4*n4);
+
 	}
-    output.position = mul(output.position, WorldViewProjection);
+	output.position = mul(output.position, WorldViewProjection);
+	output.Normal = mul(output.Normal, WorldViewProjection);
     //output.position = mul(output.position, matView);
     //output.position = mul(output.position, WorldViewProjection);
 
@@ -133,8 +146,6 @@ PSInput VS(VSInput input)
     //output.normal = normalize(output.normal);
 
     return output;
-
-    return output;
 }
 
 
@@ -143,7 +154,7 @@ PSInput VS(VSInput input)
 //--------------------------------------------------------------------------------------
 
 
-float4 PS(PSInput input) : SV_Target
+float4 PS(PSInput Input) : SV_Target
 {
     // Interpolating normal can unnormalize it, so normalize it.
     //input.normal = normalize(input.normal);
@@ -152,7 +163,12 @@ float4 PS(PSInput input) : SV_Target
 
     // return ComputeDirectionalLight(gMaterial, gDirLight, input.normal, toEyeW);
 	//return input.color;
-	return saturate(
-        shaderTextures[0].Sample(SampleType, input.tex)
+	float3 lightDir = gDirLight.LightDirection;
+	float diffuseLighting = saturate(dot(Input.Normal, -lightDir));
+
+	//diffuseLighting *= ((length(lightDir) * length(lightDir)) / dot(light.Position - Input.WorldPosition, light.Position - Input.WorldPosition));
+
+	return saturate((gDirLight.Diffuse * diffuseLighting + gDirLight.Ambient) *
+        shaderTextures[0].Sample(SampleType, Input.tex)
         );
 }

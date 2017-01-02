@@ -136,14 +136,15 @@ void Camera::update(float dt)
 	{
 		dir += L * gDInput->mouseDZ()/2;
 	}
-	mEyes = mEyes + dir * mSpeed * dt;
+	if(XMVector3LengthSq(mEyes + dir * mSpeed * dt).m128_f32[0] > 1)
+		mEyes = mEyes + dir * mSpeed * dt;
 	//if(gDInput->mouseDZ()==0)
 	// mLookat = mLookat + dir*mSpeed*dt;
 
 	//change orientation when push the right button of mouse
 	float pitch = 0.0f;
 	float yAngle = 0.0f;
-	if (gDInput->mouseButtonDown(0))
+	if (gDInput->mouseButtonDown(1))
 	{
 		pitch = gDInput->mouseDY() / 150.0f;
 		yAngle = gDInput->mouseDX() / 150.0f;

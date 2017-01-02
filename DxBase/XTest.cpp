@@ -3,6 +3,7 @@
 #include <fstream>
 #include "GeometryData.h"
 #include "../MMDFormats/MikuMikuFormats/Pmx.h"
+#include "UserController.h"
 
 std::ofstream debug("debug.txt");
 extern DirectInput *gDInput;
@@ -60,7 +61,7 @@ void XTest::OnInit()
 
 	// Load Model
 
-	motion_controller_.LoadModel(L"..\\data\\tda2\\", L"tda2.pmx", L"tda2.vmd");
+	motion_controller_.LoadModel(L"..\\data\\tda2\\", L"tda.pmx", L"tda2.vmd");
 
 
 	//std::vector<MyMeshData::Vertex> model_vertices_;
@@ -187,9 +188,9 @@ void XTest::OnInit()
 	//proje = XMMatrixPerspectiveFovLH(XM_PIDIV2, _aspectRatio, 0.01f, 100.0f);
 	camera_ptr_->setLens(XM_PIDIV4, _aspectRatio, 0.01f, 1000.0f);
 
-	dir_light_.Ambient = XMFLOAT4(0.1f, 0.22f, 0.42f, 1.0f);
-	dir_light_.Diffuse = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
-	dir_light_.Direction = XMFLOAT3(1.0f, 1.0f, 1.0f);
+	dir_light_.Ambient = XMFLOAT4(0.42f, 0.42f, 0.42f, 1.0f);
+	dir_light_.Diffuse = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);
+	dir_light_.Direction = XMFLOAT3(1.0f,0.0f,1.0f);
 
 	material_.Ambient = XMFLOAT4(0.5f, 0.78f, 0.98f, 1.0f);
 	material_.Diffuse = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
@@ -229,6 +230,7 @@ void XTest::OnInit()
 			texture_array.push_back(tmp);
 		}
 	}
+
 }
 
 //--------------------------------------------------------------------
@@ -248,12 +250,12 @@ void XTest::OnUpdate()
 
 	if (gDInput->keyDown(DIK_P))
 	{
-		g_pause = !g_pause;
+		UserController::getInstance()->TogglePlay();
 	}
 
 	camera_ptr_->update(t);
 	//update camera
-	if (g_pause && !gDInput->keyDown(DIK_Z))
+	if (UserController::getInstance()->play)
 	{
 		if (t >= 1 / 60.0f)
 		{
@@ -268,6 +270,8 @@ void XTest::OnUpdate()
 			dwTimeStart = dwTimeCur;
 		}
 	}
+	auto UIC = UserController::getInstance();
+	dir_light_.Direction = XMFLOAT3(UIC->lx, UIC->ly, UIC->lz);
 	constant_buffer_.mDirLight = dir_light_;
 	constant_buffer_.mMaterial = material_;
 	constant_buffer_.mEyeW = XMFLOAT3(20.0f, 20.0f, 20.0f);
@@ -275,6 +279,7 @@ void XTest::OnUpdate()
 	{
 		constant_buffer_.skeleton[i] = XMMatrixTranspose(motion_controller_.skeleton_matrix[i]);
 	}
+
 	//_pImmediateContext->UpdateSubresource(constant_buffer_d3dptr_, 0, NULL, &constant_buffer_, 0, 0);
 }
 
@@ -326,7 +331,7 @@ void XTest::OnRender()
 		_pImmediateContext->DrawIndexed(model.materials.get()[i].index_count, total_index, 0);
 		total_index += model.materials.get()[i].index_count;
 	}
-
+	UserController::getInstance()->render();
 	_pSwapChain->Present(0, 0);
 }
 

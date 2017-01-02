@@ -1,5 +1,6 @@
 #include "MYAPP.h"
 
+
 //-----------------------------------------------------------------------------
 // Constructor
 //-----------------------------------------------------------------------------
@@ -234,14 +235,20 @@ HRESULT MYAPP::InitDevice()
 	vp.TopLeftX = 0;
 	vp.TopLeftY = 0;
 	_pImmediateContext->RSSetViewports(1, &vp);
+
+
+	ImGui_ImplDX11_Init(_hwnd, _pd3dDevice, _pImmediateContext);
+
 	return S_OK;
 }
+extern LRESULT ImGui_ImplDX11_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 LRESULT MYAPP::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	PAINTSTRUCT ps;
 	HDC hdc;
-
+	if (ImGui_ImplDX11_WndProcHandler(hWnd, message, wParam, lParam))
+		return true;
 	switch (message)
 	{
 	case WM_PAINT:

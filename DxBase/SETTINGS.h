@@ -12,6 +12,9 @@
 #include <DirectXMath.h>
 #include <D3Dcompiler.h>
 #include <iostream>
+
+#include <imgui.h>
+#include "imgui_impl_dx11.h"
 //--------------------------------------------------------------------------------------
 // Helper for compiling shaders with D3DX11
 // input(filename, entry function name, version, (out)result)

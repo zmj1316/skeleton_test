@@ -1,7 +1,7 @@
 #include "MotionController.h"
 #include "mathUtil.h"
 #include "../MMDFormats/MikuMikuFormats/Pmd.h"
-#include "pugixml.hpp"
+#include "UserController.h"
 
 MotionController::~MotionController()
 {
@@ -229,7 +229,6 @@ void MotionController::updateIK()
 		{
 			auto &IK_bone_mat = (skeleton_matrix[i]);
 			auto const &target_bone = model_.bones.get()[IK_bone.ik_target_bone_index];
-
 			for (int loop_count = 0; loop_count < IK_bone.ik_loop; ++loop_count)
 			{
 				//for (int attention_index = 0; attention_index < IK_bone.ik_link_count; ++attention_index)
@@ -241,6 +240,9 @@ void MotionController::updateIK()
 					auto const &effector_mat = (skeleton_matrix[IK_bone.ik_target_bone_index]);
 					effector_position = effector_mat.r[3];
 					target_position = IK_bone_mat.r[3];
+					target_position.m128_f32[0] += UserController::getInstance()->x;
+					target_position.m128_f32[1] += UserController::getInstance()->y;
+					target_position.m128_f32[2] += UserController::getInstance()->z;
 
 					auto inv_coord = (XMMatrixInverse(nullptr, skeleton_matrix[link.link_target]));
 
@@ -456,36 +458,36 @@ void MotionController::updateChildSkeletonMatrix(int i)
 		updateChildSkeletonMatrix(child);
 	}
 }
-
-void MotionController::dumpSkeletonTree(std::string file_name)
-{
-	pugi::xml_document dump_doc;
-	auto root_node = dump_doc.append_child(pugi::node_element);
-	root_node.set_name("root");
-	dumpChildSkeletonNodes(root_index_, root_node);
-
-	dump_doc.save_file(file_name.c_str());
-	exit(1);
-}
-
-void MotionController::dumpChildSkeletonNodes(int bone_index, pugi::xml_node &xmlnode)
-{
-	auto &this_bone = model_.bones.get()[bone_index];
-	auto this_node = xmlnode.append_child("node");
-	auto identifier_node = this_node.append_child("identifier").text() = "\tidentifier_text\t";
-	//identifier_node.set_name("identifier");
-	//identifier_node.set_value("test");
-	auto transform_node = this_node.append_child("transform");
-	pugi::char_t buffer[MAX_ROW_CHAR_COUNT];
-	auto translation = skeleton_locals[bone_index].r[3].m128_f32;
-	sprintf_s(buffer, "\t%f %f %f\t", translation[0], translation[1], translation[2]);
-	transform_node.append_child("row0").text() = buffer;
-	transform_node.append_child("row1");
-	transform_node.append_child("row2");
-	transform_node.append_child("row3");
-	for (auto child : skeleton_tree_[bone_index].childs)
-	{
-		dumpChildSkeletonNodes(child, this_node);
-	}
-}
+//
+//void MotionController::dumpSkeletonTree(std::string file_name)
+//{
+//	pugi::xml_document dump_doc;
+//	auto root_node = dump_doc.append_child(pugi::node_element);
+//	root_node.set_name("root");
+//	dumpChildSkeletonNodes(root_index_, root_node);
+//
+//	dump_doc.save_file(file_name.c_str());
+//	exit(1);
+//}
+//
+//void MotionController::dumpChildSkeletonNodes(int bone_index, pugi::xml_node &xmlnode)
+//{
+//	auto &this_bone = model_.bones.get()[bone_index];
+//	auto this_node = xmlnode.append_child("node");
+//	auto identifier_node = this_node.append_child("identifier").text() = "\tidentifier_text\t";
+//	//identifier_node.set_name("identifier");
+//	//identifier_node.set_value("test");
+//	auto transform_node = this_node.append_child("transform");
+//	pugi::char_t buffer[MAX_ROW_CHAR_COUNT];
+//	auto translation = skeleton_locals[bone_index].r[3].m128_f32;
+//	sprintf_s(buffer, "\t%f %f %f\t", translation[0], translation[1], translation[2]);
+//	transform_node.append_child("row0").text() = buffer;
+//	transform_node.append_child("row1");
+//	transform_node.append_child("row2");
+//	transform_node.append_child("row3");
+//	for (auto child : skeleton_tree_[bone_index].childs)
+//	{
+//		dumpChildSkeletonNodes(child, this_node);
+//	}
+//}
 
