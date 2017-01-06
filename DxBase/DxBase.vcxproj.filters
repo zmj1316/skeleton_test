@@ -69,6 +69,12 @@
     <ClInclude Include="UserController.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="MMDPhysX.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="PhysXBasic.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="DirectInputClass.cpp">
@@ -108,6 +114,12 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="UserController.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="MMDPhysX.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="PhysXBasic.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

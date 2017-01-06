@@ -121,9 +121,7 @@ PSInput VS(VSInput input)
 		n3 = mul(input.normal, i3);
 		p4 = mul(input.position, i4);
 		n4 = mul(input.normal, i4);
-	//output.position = Pos;
-	//output.position = p1;
-	//output.position = w1 * p1 + (1 - w1) * p2;
+
     output.position= (w1*p1+w2*p2+w3*p3+w4*p4);
 	output.Normal = (w1*n1 + w2 * n2 + w3*n3 + w4*n4);
 
