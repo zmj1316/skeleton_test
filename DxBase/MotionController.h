@@ -15,7 +15,7 @@ namespace pugi
 class MotionController
 {
 public:
-	MotionController(): ctime(0), root_index_(-1)
+	MotionController(): ctime(0), root_index_(1)
 	{
 	}
 
@@ -79,10 +79,57 @@ private:
 	std::vector<float> morph_weights_;
 
 	int ctime;
-	int root_index_;
+	int root_index_ = 1;
 	void allocVectors();
 	void buildSkeletonTree();
 	void updateChildSkeletonMatrix(int i);
+	void updateInherited();
 
+
+	void solveFABRIK(int ik_effector,vec3 ik_position,int chain_length);
+	void resetLocals();
 	void dumpChildSkeletonNodes(int bone_index, pugi::xml_node &xmlnode);
+
+	vec4 GetRowFromBoneIndex(int index, int row)
+	{
+		const auto &mat = skeleton_matrix[index];
+		return vec4(mat.r[row]);
+	}
+
+	vec3 GetPositionFromBoneIndex(int index)
+	{
+		return GetRowFromBoneIndex(index, 3).xyz();
+	}
+
+	static float rotate_vectors(vec3 axis, vec3 from, vec3 to)
+	{
+		auto cosine = dot(from, to);
+		if (cosine > 1.0f)
+			cosine = 1.0f;
+		auto angle = acos(cosine);
+		auto c = cross(from, to);
+		if (dot(c, axis) < 0)
+			angle = -angle;
+		return angle;
+	}
+
+	struct FABRIKChainLink
+	{
+	public:
+		/** Position of bone in component space. */
+		vec3 Position;
+
+		/** Distance to its parent link. */
+		float Length;
+
+		/** Bone in SkeletalMesh */
+		int bone_index;
+
+		FABRIKChainLink(const vec3 &InPosition, const float &InLength, int InBone)
+			: Position(InPosition)
+			, Length(InLength)
+			, bone_index(InBone)
+		{
+		}
+	};
 };

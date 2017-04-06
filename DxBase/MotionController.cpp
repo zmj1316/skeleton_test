@@ -141,6 +141,7 @@ void MotionController::updateMorphAnimation(const std::vector<MyMeshData::Vertex
 
 void MotionController::updateBoneAnimation()
 {
+	resetLocals();
 	for (int i = 0; i < model_.bone_count; ++i)
 	{
 		auto &bone = model_.bones[i];
@@ -185,33 +186,12 @@ void MotionController::updateBoneAnimation()
 		}
 	}
 	updateChildSkeletonMatrix(root_index_);
-	updateIK();
+	if (UserController::getInstance()->useFABRIK)
+		updateIK_FABRIK();
+	else
+		updateIK();
+	updateInherited();
 }
-
-//inline XMVECTOR _Clamp(XMVECTOR r, XMVECTOR low, XMVECTOR up)
-//{
-//	XMVECTOR res = r;
-//	for (int i = 0; i < 3; ++i)
-//	{
-//		if(r.m128_f32[i] < low.m128_f32[i])
-//		{
-//			float num = 2.0f * low.m128_f32[i] - r.m128_f32[i];
-//			if (num <= up.m128_f32[i])
-//				res.m128_f32[i] = num;
-//			else
-//				res.m128_f32[i] = low.m128_f32[i];
-//		}
-//		if(r.m128_f32[i] > up.m128_f32[i])
-//		{
-//			float num = 2.0f * up.m128_f32[i] - r.m128_f32[i];
-//			if (num >= low.m128_f32[i])
-//				res.m128_f32[i] = num;
-//			else
-//				res.m128_f32[i] = up.m128_f32[i];
-//		}
-//	}
-//	return res;
-//}
 
 void MotionController::updateIK()
 {
@@ -260,8 +240,8 @@ void MotionController::updateIK()
 					angle = min(acos(p), IK_bone.ik_loop_angle_limit);
 
 					auto axis = -XMVector3Cross(local_target_direction, local_effector_direction);
-					//if (XMVector3LengthSq(axis).m128_f32[0] < 1e-6)
-					//	continue;
+					if (XMVector3LengthSq(axis).m128_f32[0] < 1e-4)
+						continue;
 					auto rotation = XMMatrixRotationAxis(axis, (float)angle);
 
 					//if (0)
@@ -277,7 +257,7 @@ void MotionController::updateIK()
 
 						XMFLOAT3 low(link.min_radian);
 						XMFLOAT3 high(link.max_radian);
-						if(low.x < -M_PI/2)
+						if (low.x < -M_PI / 2)
 						{
 							//auto clamped_euler = _Clamp(new_euler, XMLoadFloat3(&low), XMLoadFloat3(&high));
 
@@ -330,65 +310,238 @@ void MotionController::updateIK()
 	}
 }
 
-//void MotionController::updateIK_FABRIK()
-//{
-//	XMVECTOR effector_position;
-//	XMVECTOR target_position;
-//
-//	XMVECTOR local_effector_position;
-//	XMVECTOR local_target_position;
-//
-//
-//	for (auto i = 0; i < model_.bone_count; i++)
-//	{
-//		auto const &IK_bone = model_.bones.get()[i];
-//		if (IK_bone.bone_flag & 0x0020) // IK type
-//		{
-//			auto &IK_bone_mat = (skeleton_matrix[i]);
-//			auto &target_bone = model_.bones.get()[IK_bone.ik_target_bone_index];
-//			auto &target_bone_mat = skeleton_matrix[IK_bone.ik_target_bone_index];
-//
-//			int max_reach = 0;
-//			auto root_mat = skeleton_matrix[IK_bone.ik_links.get()[0].link_target];
-//
-//			// out of max reach detect
-//			//auto previous_mat = root_mat;
-//			//for (int attention_index = 1; attention_index < IK_bone.ik_link_count; ++attention_index)
-//			//{
-//			//	auto const &link = IK_bone.ik_links.get()[attention_index];
-//			//	auto this_mat = skeleton_matrix[link.link_target];
-//			//	auto distance = this_mat.r[3] - previous_mat.r[3];
-//			//	max_reach += XMVector3Length(distance).m128_f32[0];
-//			//	previous_mat = this_mat;
-//			//}
-//
-//			//auto root_to_target_distance_sq = XMVector3LengthSq(root_mat.r[3] - IK_bone_mat.r[3]).m128_f32[0];
-//			//if (root_to_target_distance_sq > max_reach * max_reach)
-//			//{
-//			//	
-//			//}
-//
-//			float slop = XMVector3Length(target_bone_mat.r[3] - IK_bone_mat.r[3]).m128_f32[0];
-//			if (slop > 1e-3)
-//			{
-//				target_bone_mat.r[3] = IK_bone_mat.r[3];
-//
-//				int loop_count = 0;
-//				while (slop > 1e-3 && loop_count++ < IK_bone.ik_loop)
+
+void MotionController::updateIK_FABRIK()
+{
+	for (auto i = 0; i < model_.bone_count; i++)
+	{
+		auto const &IK_bone = model_.bones.get()[i];
+		if (IK_bone.bone_flag & 0x0020) // IK type
+		{
+			auto ik_effector = IK_bone.ik_target_bone_index;
+			std::vector<int> bone_nodes;
+			bone_nodes.push_back(ik_effector);
+			// 极向矢量
+			vec3 pole_vector = vec3(0, 0, 1);
+			// 极向关节索引
+			int pole_effctor_index = -1;
+			for (int attention_index = 0; attention_index < IK_bone.ik_link_count; ++attention_index)
+			{
+				auto const &link = IK_bone.ik_links.get()[attention_index];
+				auto &link_bone = model_.bones.get()[link.link_target];
+				if (link.angle_lock != 0)
+				{
+					pole_effctor_index = bone_nodes.size();
+					const auto& xmmat = skeleton_matrix[link.link_target];
+					pole_vector = (vec4(link.min_radian[2], link.min_radian[1], link.min_radian[0],0) * mat4(vec4(xmmat.r[0]), vec4(xmmat.r[1]), vec4(xmmat.r[2]), vec4(xmmat.r[2]))).xyz().normalized();
+				}
+				bone_nodes.push_back(link.link_target);
+			}
+			int ik_root = bone_nodes[IK_bone.ik_link_count];
+			float _precision = 10e-6f;
+			// IK 目标位置
+			auto target_position = GetPositionFromBoneIndex(i);
+			// IK 链根节点位置
+			auto root_position = GetPositionFromBoneIndex(ik_root);
+			// 从根到 IK 目标
+			auto root_to_target = target_position - root_position;
+
+			auto root_to_effector = GetPositionFromBoneIndex(ik_effector) - root_position;
+
+			// Maximum length of skeleton segment at full extension
+			float maximum_reach = 0;
+
+			int32_t const bone_number = bone_nodes.size();
+
+			// Build the chain
+			std::vector<FABRIKChainLink> chain;
+			chain.reserve(bone_number);
+
+			for (size_t i = 0; i < bone_number - 1; i++)
+			{
+				const auto bone = bone_nodes[i];
+
+				auto chain_node = FABRIKChainLink(GetPositionFromBoneIndex(bone),vec3(skeleton_locals[bone].r[3].m128_f32).length(),bone);
+				if (chain_node.Length > 0)
+				{
+					chain.push_back(chain_node);
+					maximum_reach += chain_node.Length;
+				}
+			}
+
+			// 处理 chain root
+			{
+				const auto bone = bone_nodes[bone_number - 1];
+				auto chain_node = FABRIKChainLink(GetPositionFromBoneIndex(bone), vec3(skeleton_locals[bone].r[3].m128_f32).length(), bone);
+				chain_node.Length = 0;
+				chain.push_back(chain_node);
+			}
+
+
+			bool bone_location_updated = false;
+			int32_t const num_chain_links = chain.size();
+
+			float const root_to_target_dist_sq = root_to_target.lengthSquared();
+			float maxreach_sq = (maximum_reach * maximum_reach);
+
+			if (root_to_target_dist_sq > maxreach_sq)
+			{
+				// 目标不可达，全部关节伸直
+				for (int32_t LinkIndex = num_chain_links - 2; LinkIndex >= 0; LinkIndex--)
+				{
+					FABRIKChainLink const &ParentLink = chain[LinkIndex + 1];
+					FABRIKChainLink &CurrentLink = chain[LinkIndex];
+					CurrentLink.Position = ParentLink.Position + (target_position - ParentLink.Position).normalized() * CurrentLink.Length;
+				}
+				bone_location_updated = true;
+			}
+			else
+			{
+				int32_t const tip_bone_link_index = 0;
+				float slop = (chain[tip_bone_link_index].Position - target_position).length();
+//				bool singularity = (root_to_target.normalized().dot((chain[num_chain_links - 2].Position - root_position).normalized())) > 0.999f;
+//				vec3 singularity_offset;
+//				if (singularity)
 //				{
-//					auto links = IK_bone.ik_links.get();
-//					for (int link_index = IK_bone.ik_link_count - 2; link_index > 0; --link_index)
-//					{
-//						auto &current_link = skeleton_matrix[links[link_index].link_target];
-//						auto &next_link = skeleton_matrix[links[link_index].link_target + 1];
-//					}
+//					singularity_offset = -pole_vector * chain[0].Length / 2;
 //				}
-//			}
-//		}
-//	}
-//}
+				if (slop > _precision)
+				{
+					chain[tip_bone_link_index].Position = target_position;
+					int iteration_count = 0;
+					float prev_slop = 0;
+					while (slop > _precision && abs(prev_slop - slop) > _precision && iteration_count++ <= IK_bone.ik_loop)
+					{
+//						if (singularity && iteration_count == 1)
+//						{
+//							chain[tip_bone_link_index].Position += singularity_offset;
+//						}
+						// "Forward Reaching" stage - adjust bones from end effector.
+						for (int LinkIndex = tip_bone_link_index + 1; LinkIndex < num_chain_links - 1; LinkIndex++)
+						{
+							FABRIKChainLink &CurrentLink = chain[LinkIndex];
+							FABRIKChainLink const &ChildLink = chain[LinkIndex - 1];
+
+							auto dir = (CurrentLink.Position - ChildLink.Position).normalized();
+							CurrentLink.Position = ChildLink.Position + dir * ChildLink.Length;
+						}
+
+						// "Backward Reaching" stage - adjust bones from root.
+						for (int LinkIndex = num_chain_links - 2; LinkIndex > tip_bone_link_index; LinkIndex--)
+						{
+							FABRIKChainLink &CurrentLink = chain[LinkIndex];
+							FABRIKChainLink const &ParentLink = chain[LinkIndex + 1];
+
+							CurrentLink.Position = ParentLink.Position + (CurrentLink.Position - ParentLink.Position).normalized() * CurrentLink.Length;
+						}
+
+						// Re-check distance between tip location and effector location
+						// Since we're keeping tip on top of effector location, check with its parent bone.
+						prev_slop = slop;
+						slop = abs(chain[tip_bone_link_index].Length - (chain[tip_bone_link_index + 1].Position - target_position).length());
+					}
+
+					// Place tip bone based on how close we got to target.
+					{
+						FABRIKChainLink const &ParentLink = chain[tip_bone_link_index + 1];
+						FABRIKChainLink &CurrentLink = chain[tip_bone_link_index];
+
+						CurrentLink.Position = ParentLink.Position + (CurrentLink.Position - ParentLink.Position).normalized() * CurrentLink.Length;
+					}
+
+					// 旋转关节 position 以符合极向
+					if (pole_effctor_index > 0)
+					{
+						auto root_to_pole_effector = (chain[pole_effctor_index].Position - root_position).normalized();
+						auto dir_effector = cross(root_to_pole_effector, root_to_target).normalized();
+						auto dir_target = cross(pole_vector, root_to_target).normalized();
+
+						vec3 const RotationAxis = root_to_target;
+						float const RotationAngle = rotate_vectors(RotationAxis, dir_effector, dir_target);
+
+						for (int i = 0; i < chain.size(); ++i)
+						{
+							auto world_pos = chain[i].Position;
+							auto local_pos = world_pos - root_position;
+							auto rotate_mat = mat3::fromAxisAngle(RotationAxis, RotationAngle).transposed();
+							local_pos = local_pos * rotate_mat;
+							chain[i].Position = local_pos + root_position;
+						}
+					}
+
+					bone_location_updated = true;
+				}
+			}
+			if (bone_location_updated)
+			{
+				//FABRIK algorithm - re-orientation of bone local axes after translation calculation
+				for (int LinkIndex = num_chain_links - 1; LinkIndex > 0; LinkIndex--)
+				{
+					FABRIKChainLink const &CurrentLink = chain[LinkIndex];
+					FABRIKChainLink const &ChildLink = chain[LinkIndex - 1];
+//					skeleton_matrix[CurrentLink.bone_index].r[3].m128_f32[0] = CurrentLink.Position.x;
+//					skeleton_matrix[CurrentLink.bone_index].r[3].m128_f32[1] = CurrentLink.Position.y;
+//					skeleton_matrix[CurrentLink.bone_index].r[3].m128_f32[2] = CurrentLink.Position.z;
+
+					const auto child_position = GetPositionFromBoneIndex(ChildLink.bone_index);
+					const auto current_position = CurrentLink.Position;
+					// Calculate pre-translation vector between this bone and child
+					vec3 const OldDir = (child_position - current_position).normalized();
+
+					// Get vector from the post-translation bone to it's child
+					vec3 const NewDir = (ChildLink.Position - CurrentLink.Position).normalized();
+
+					// Calculate axis of rotation from pre-translation vector to post-translation vector
+					vec3 const RotationAxis = cross(OldDir, NewDir).normalized();
+					float const RotationAngle = acos(dot(OldDir, NewDir));
+
+					XMVECTOR m4;
+					m4.m128_f32[0] = RotationAxis.x;
+					m4.m128_f32[1] = RotationAxis.y;
+					m4.m128_f32[2] = RotationAxis.z;
+					m4.m128_f32[3] = 1;
+					// Calculate absolute rotation and set it
+					auto r_matrix = XMMatrixRotationAxis(m4, RotationAngle);
+					skeleton_matrix[CurrentLink.bone_index] = skeleton_matrix[CurrentLink.bone_index] * r_matrix;
+
+					// 旋转极向关节的父关节的 roll 使得极向关节的 Z 轴符合 pole_vector
+//					if (pole_effctor_index > 0 && LinkIndex - 1 == pole_effctor_index)
+//					{
+//						auto axis = NewDir;
+//						auto z_dir = GetRowFromBoneIndex(CurrentLink.bone_index, 2).xyz().normalized();
+//						auto this_dir = cross(axis, z_dir).normalized();
+//						auto taret_dir = cross(axis, pole_vector).normalized();
+//
+//						float const angle = rotate_vectors(axis, this_dir, taret_dir);
+//						XMVECTOR m4;
+//						m4.m128_f32[0] = RotationAxis.x;
+//						m4.m128_f32[1] = RotationAxis.y;
+//						m4.m128_f32[2] = RotationAxis.z;
+//						// Calculate absolute rotation and set it
+//						auto r_matrix2 = XMMatrixRotationAxis(m4, angle);
+//						skeleton_matrix[CurrentLink.bone_index] = skeleton_matrix[CurrentLink.bone_index] * r_matrix2;
+//					}
 
 
+					skeleton_matrix[CurrentLink.bone_index].r[3].m128_f32[0] = CurrentLink.Position.x;
+					skeleton_matrix[CurrentLink.bone_index].r[3].m128_f32[1] = CurrentLink.Position.y;
+					skeleton_matrix[CurrentLink.bone_index].r[3].m128_f32[2] = CurrentLink.Position.z;
+					auto& new_world = skeleton_matrix[CurrentLink.bone_index];
+					auto& parent = skeleton_matrix[skeleton_tree_[CurrentLink.bone_index].parent];
+					skeleton_locals[CurrentLink.bone_index] = new_world * XMMatrixInverse(nullptr, parent);
+					updateChildSkeletonMatrix(CurrentLink.bone_index);
+				}
+
+				// 处理末尾 effector 的旋转
+				//chain[0].bone->worldTransformMatrix = ik_target->worldTransformMatrix;
+				//chain[0].bone->worldTransformMatrix.m[3][0] = chain[0].Position.x;
+				//chain[0].bone->worldTransformMatrix.m[3][1] = chain[0].Position.y;
+				//chain[0].bone->worldTransformMatrix.m[3][2] = chain[0].Position.z;
+				//chain[0].bone->pFirstChild->ComputeWorldTransform(chain[0].bone->worldTransformMatrix);
+			}
+		}
+	}
+}
 
 void MotionController::allocVectors()
 {
@@ -417,7 +570,7 @@ void MotionController::buildSkeletonTree()
 			skeleton_tree_[model_bone_arr[i].parent_index].childs.push_back(i);
 			skeleton_tree_[i].parent = model_bone_arr[i].parent_index;
 		}
-		else
+		else if (root_index_ < 0)
 		{
 			root_index_ = i;
 		}
@@ -432,19 +585,19 @@ void MotionController::buildSkeletonTree()
 
 void MotionController::updateChildSkeletonMatrix(int i)
 {
-	if (model_.bones.get()[i].grant_weight > 0)
-	{
-		if (model_.bones.get()[i].bone_flag & 0x0100)
-		{
-			auto tmp = skeleton_locals[i].r[3];
-			skeleton_locals[i] = model_.bones.get()[i].grant_weight * skeleton_locals[model_.bones.get()[i].grant_parent_index] + (1 - model_.bones.get()[i].grant_weight) * skeleton_locals[i];
-			skeleton_locals[i].r[3] = tmp;
-		}
-		else
-		{
-			skeleton_locals[i].r[3] = model_.bones.get()[i].grant_weight * skeleton_locals[model_.bones.get()[i].grant_parent_index].r[3] + (1 - model_.bones.get()[i].grant_weight) * skeleton_locals[i].r[3];
-		}
-	}
+	//	if (model_.bones.get()[i].grant_weight > 0)
+	//	{
+	//		if (model_.bones.get()[i].bone_flag & 0x0100)
+	//		{
+	//			auto tmp = skeleton_locals[i].r[3];
+	//			skeleton_locals[i] = model_.bones.get()[i].grant_weight * skeleton_locals[model_.bones.get()[i].grant_parent_index] + (1 - model_.bones.get()[i].grant_weight) * skeleton_locals[i];
+	//			skeleton_locals[i].r[3] = tmp;
+	//		}
+	//		else
+	//		{
+	//			skeleton_locals[i].r[3] = model_.bones.get()[i].grant_weight * skeleton_locals[model_.bones.get()[i].grant_parent_index].r[3] + (1 - model_.bones.get()[i].grant_weight) * skeleton_locals[i].r[3];
+	//		}
+	//	}
 	if (skeleton_tree_[i].parent >= 0)
 	{
 		skeleton_matrix[i] = skeleton_locals[i] * skeleton_matrix[skeleton_tree_[i].parent];
@@ -458,6 +611,43 @@ void MotionController::updateChildSkeletonMatrix(int i)
 		updateChildSkeletonMatrix(child);
 	}
 }
+
+void MotionController::updateInherited()
+{
+	for (int i = 0; i < bone_count_; ++i)
+	{
+		const auto &bone = model_.bones.get()[i];
+		if (bone.grant_weight > 0)
+		{
+			if (bone.bone_flag & 0x0100)
+			{
+				auto tmp = skeleton_locals[i].r[3];
+				skeleton_locals[i] = bone.grant_weight * skeleton_locals[bone.grant_parent_index] + (1 - bone.grant_weight) * skeleton_locals[i];
+				skeleton_locals[i].r[3] = tmp;
+			}
+			else
+			{
+				skeleton_locals[i].r[3] = bone.grant_weight * skeleton_locals[bone.grant_parent_index].r[3] + (1 - bone.grant_weight) * skeleton_locals[i].r[3];
+			}
+		}
+		updateChildSkeletonMatrix(i);
+	}
+}
+
+void MotionController::resetLocals()
+{
+	auto model_bone_arr = model_.bones.get();
+	for (int i = 0; i < bone_count_; ++i)
+	{
+		if (model_bone_arr[i].parent_index >= 0)
+		{
+			skeleton_locals[i] = MathUtil::compose(model_bone_arr[i].position - model_bone_arr[model_bone_arr[i].parent_index].position);
+		}
+		else
+			skeleton_locals[i] = MathUtil::compose(model_bone_arr[i].position);
+	}
+}
+
 //
 //void MotionController::dumpSkeletonTree(std::string file_name)
 //{
@@ -490,4 +680,3 @@ void MotionController::updateChildSkeletonMatrix(int i)
 //		dumpChildSkeletonNodes(child, this_node);
 //	}
 //}
-

@@ -77,6 +77,7 @@ struct vec3 {
     vec3(real_t x, real_t y, real_t z):x(x), y(y), z(z){}
     vec3(vec3 const& v):x(v.x), y(v.y), z(v.z){}
     vec3(vec2 const& v, real_t z):x(v.x), y(v.y), z(z){}
+	vec3(float f[4]):x(f[0]),y(f[1]),z(f[2]){}
 	//vec3& operator=(vec3 const& v) {
 	//	x = v.x; y = v.y; z = v.z;
 	//	return *this;

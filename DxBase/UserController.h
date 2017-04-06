@@ -1,20 +1,24 @@
 #pragma once
 #include "SETTINGS.h"
+
 class UserController
 {
 private:
-	static UserController* instance;
+	static UserController *instance;
 public:
-	static UserController* getInstance() {
+	static UserController* getInstance()
+	{
 		if (instance == nullptr)
 			instance = new UserController();
 		return instance;
 	}
 
 	bool play;
-	float x;
-	float y;
-	float z;
+	bool useFABRIK = true;
+
+	float x = 0;
+	float y = 0;
+	float z = 0;
 
 	float lx = 1;
 	float ly = 0;
@@ -22,15 +26,26 @@ public:
 
 	UserController();
 	~UserController();
-	void TogglePlay() {
+
+	void TogglePlay()
+	{
 		play = !play;
 	}
-	void reset() {
+
+	void ToggleIK()
+	{
+		useFABRIK = !useFABRIK;
+	}
+
+	void reset()
+	{
 		x = 0;
 		y = 0;
 		z = 0;
 	}
-	void render() {
+
+	void render()
+	{
 		ImGui_ImplDX11_NewFrame();
 		ImGui::SetNextWindowSize(ImVec2(300, 400), ImGuiSetCond_FirstUseEver);
 		static bool show_another_window = true;
@@ -41,6 +56,16 @@ public:
 			TogglePlay();
 		if (ImGui::Button("Reset", ImVec2(50, 30)))
 			reset();
+		if (useFABRIK)
+		{
+			if (ImGui::Button("FABRIK", ImVec2(50, 30)))
+				ToggleIK();
+		}
+		else
+		{
+			if (ImGui::Button("CCD", ImVec2(50, 30)))
+				ToggleIK();
+		}
 		ImGui::SliderFloat("IK-x", &x, -5, 5);
 		ImGui::SliderFloat("IK-y", &y, -2, 5);
 		ImGui::SliderFloat("IK-z", &z, -5, 5);
@@ -59,4 +84,3 @@ public:
 		ImGui::Render();
 	}
 };
-

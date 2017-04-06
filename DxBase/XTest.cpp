@@ -61,7 +61,7 @@ void XTest::OnInit()
 
 	// Load Model
 
-	motion_controller_.LoadModel(L"..\\data\\tda2\\", L"tda.pmx", L"tda2.vmd");
+	motion_controller_.LoadModel(L"..\\data\\pmx\\", L"TDA Sakura Miku.pmx", L"1.vmd");
 
 
 	//std::vector<MyMeshData::Vertex> model_vertices_;
