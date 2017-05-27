@@ -80,5 +80,7 @@ float DirectInput::mouseDY()
 
 float DirectInput::mouseDZ()
 {
-	return (float)mMouseState.lZ;
+	auto t = mMouseState.lZ;
+	mMouseState.lZ = 0;
+	return (float)t;
 }

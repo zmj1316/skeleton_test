@@ -19,7 +19,7 @@ Camera::Camera()
 	mUp = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 
 	//change Sensitivity
-	mSpeed = 0.001f;
+	mSpeed = 0.01f;
 }
 
 Camera::Camera(XMVECTOR eye, XMVECTOR lookat, XMVECTOR up)
@@ -78,7 +78,7 @@ void Camera::lookAt(XMVECTOR &pos, XMVECTOR &target, XMVECTOR &up)
 	mEyes = pos;
 	mLookat = target;
 	mUp = up;
-	mSpeed = 0.1f;
+	mSpeed = 0.5f;
 	//build view
 	mView = XMMatrixLookAtLH(pos, target, up);
 }
@@ -128,16 +128,12 @@ void Camera::update(float dt)
 
 	//change position of camera
 	dir = XMVector3Normalize(dir);
-	if(gDInput->mouseDZ()>0)
+	auto whell = gDInput->mouseDZ();
 	{
-		dir += L * gDInput->mouseDZ()/2;
+		dir += L * whell/100;
 	}
-	if (gDInput->mouseDZ()<0)
-	{
-		dir += L * gDInput->mouseDZ()/2;
-	}
-	if(XMVector3LengthSq(mEyes + dir * mSpeed * dt).m128_f32[0] > 1)
-		mEyes = mEyes + dir * mSpeed * dt;
+	if (XMVector3LengthSq(mEyes + dir * mSpeed * dt).m128_f32[0] > 1)
+		mEyes = mEyes + dir * mSpeed;
 	//if(gDInput->mouseDZ()==0)
 	// mLookat = mLookat + dir*mSpeed*dt;
 

@@ -142,6 +142,8 @@ void MotionController::updateMorphAnimation(const std::vector<MyMeshData::Vertex
 void MotionController::updateBoneAnimation()
 {
 	resetLocals();
+//	updateChildSkeletonMatrix(root_index_);
+//	return;
 	for (int i = 0; i < model_.bone_count; ++i)
 	{
 		auto &bone = model_.bones[i];
@@ -209,7 +211,7 @@ void MotionController::updateIK()
 		{
 			auto &IK_bone_mat = (skeleton_matrix[i]);
 			auto const &target_bone = model_.bones.get()[IK_bone.ik_target_bone_index];
-			for (int loop_count = 0; loop_count < IK_bone.ik_loop; ++loop_count)
+			for (int loop_count = 0; loop_count < IK_bone.ik_loop*5; ++loop_count)
 			{
 				//for (int attention_index = 0; attention_index < IK_bone.ik_link_count; ++attention_index)
 				for (int attention_index = IK_bone.ik_link_count - 1; attention_index >= 0; --attention_index)
@@ -244,7 +246,7 @@ void MotionController::updateIK()
 						continue;
 					auto rotation = XMMatrixRotationAxis(axis, (float)angle);
 
-					//if (0)
+//					if (0)
 					if (link.angle_lock)
 					{
 						auto new_local = rotation * skeleton_locals[link.link_target];
@@ -333,7 +335,7 @@ void MotionController::updateIK_FABRIK()
 				{
 					pole_effctor_index = bone_nodes.size();
 					const auto& xmmat = skeleton_matrix[link.link_target];
-					pole_vector = (vec4(link.min_radian[2], link.min_radian[1], link.min_radian[0],0) * mat4(vec4(xmmat.r[0]), vec4(xmmat.r[1]), vec4(xmmat.r[2]), vec4(xmmat.r[2]))).xyz().normalized();
+					pole_vector = (vec4(link.min_radian[1], link.min_radian[2], link.min_radian[0],0) * mat4(vec4(xmmat.r[0]), vec4(xmmat.r[1]), vec4(xmmat.r[2]), vec4(xmmat.r[2]))).xyz().normalized();
 				}
 				bone_nodes.push_back(link.link_target);
 			}
@@ -484,7 +486,7 @@ void MotionController::updateIK_FABRIK()
 //					skeleton_matrix[CurrentLink.bone_index].r[3].m128_f32[2] = CurrentLink.Position.z;
 
 					const auto child_position = GetPositionFromBoneIndex(ChildLink.bone_index);
-					const auto current_position = CurrentLink.Position;
+					const auto current_position = GetPositionFromBoneIndex(CurrentLink.bone_index);
 					// Calculate pre-translation vector between this bone and child
 					vec3 const OldDir = (child_position - current_position).normalized();
 
@@ -505,22 +507,22 @@ void MotionController::updateIK_FABRIK()
 					skeleton_matrix[CurrentLink.bone_index] = skeleton_matrix[CurrentLink.bone_index] * r_matrix;
 
 					// 旋转极向关节的父关节的 roll 使得极向关节的 Z 轴符合 pole_vector
-//					if (pole_effctor_index > 0 && LinkIndex - 1 == pole_effctor_index)
-//					{
-//						auto axis = NewDir;
-//						auto z_dir = GetRowFromBoneIndex(CurrentLink.bone_index, 2).xyz().normalized();
-//						auto this_dir = cross(axis, z_dir).normalized();
-//						auto taret_dir = cross(axis, pole_vector).normalized();
-//
-//						float const angle = rotate_vectors(axis, this_dir, taret_dir);
-//						XMVECTOR m4;
-//						m4.m128_f32[0] = RotationAxis.x;
-//						m4.m128_f32[1] = RotationAxis.y;
-//						m4.m128_f32[2] = RotationAxis.z;
-//						// Calculate absolute rotation and set it
-//						auto r_matrix2 = XMMatrixRotationAxis(m4, angle);
-//						skeleton_matrix[CurrentLink.bone_index] = skeleton_matrix[CurrentLink.bone_index] * r_matrix2;
-//					}
+					if (pole_effctor_index > 0 && LinkIndex - 1 == pole_effctor_index)
+					{
+						auto axis = NewDir;
+						auto z_dir = -GetRowFromBoneIndex(CurrentLink.bone_index, 2).xyz().normalized();
+						auto this_dir = cross(axis, z_dir).normalized();
+						auto target_dir = cross(axis, pole_vector).normalized();
+
+						float const angle = rotate_vectors(axis, this_dir, target_dir);
+						XMVECTOR m4;
+						m4.m128_f32[0] = axis.x;
+						m4.m128_f32[1] = axis.y;
+						m4.m128_f32[2] = axis.z;
+						// Calculate absolute rotation and set it
+						auto r_matrix2 = XMMatrixRotationAxis(m4, angle);
+						skeleton_matrix[CurrentLink.bone_index] = skeleton_matrix[CurrentLink.bone_index] * r_matrix2;
+					}
 
 
 					skeleton_matrix[CurrentLink.bone_index].r[3].m128_f32[0] = CurrentLink.Position.x;

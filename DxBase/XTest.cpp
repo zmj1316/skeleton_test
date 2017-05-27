@@ -61,7 +61,7 @@ void XTest::OnInit()
 
 	// Load Model
 
-	motion_controller_.LoadModel(L"..\\data\\pmx\\", L"TDA Sakura Miku.pmx", L"1.vmd");
+	motion_controller_.LoadModel(L"..\\data\\tda2\\", L"tda2.pmx", L"tda2.vmd");
 
 
 	//std::vector<MyMeshData::Vertex> model_vertices_;
@@ -212,6 +212,7 @@ void XTest::OnInit()
 	samplerDesc.MinLOD = 0;
 	samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
 
+
 	// Create the texture sampler state.
 	hr = _pd3dDevice->CreateSamplerState(&samplerDesc, &sample_state_d3dptr_);
 #pragma openmp parallel for
@@ -332,7 +333,10 @@ void XTest::OnRender()
 		total_index += model.materials.get()[i].index_count;
 	}
 	UserController::getInstance()->render();
-	_pSwapChain->Present(0, 0);
+	if(UserController::getInstance()->vsync)
+		_pSwapChain->Present(1, 0);
+	else
+		_pSwapChain->Present(0, 0);
 }
 
 
